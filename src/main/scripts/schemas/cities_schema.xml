@@ -1,0 +1,7 @@
+<table name="">
+    <field name="city" type="text" index="true" store="true" sort="true"/>
+    <field name="country" type="text" index="true" store="true" sort="true"/>
+    <field name="subcountry" type="text" index="true" store="true"/>
+    <field name="geonameid" type="text" index="true" store="true"/>
+    <field name="content" type="symbol" index="true" store="true" raw="true" />
+</table>

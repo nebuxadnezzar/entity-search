@@ -1,0 +1,74 @@
+{
+    "_filterFields_":[],
+    "_limit_": 100,
+    "_sort_": true,
+    "_collector_": "content",
+    "_type_": "OR",
+    "name":["mustafa~2", "abdul*"]
+}
+
+{
+    "_filterFields_":[],
+    "_limit_": 100,
+    "_sort_": true,
+    "_collector_": "plain",
+    "_type_": "AND",
+    "name":["mustafa~2", "abdul*"]
+}
+
+{
+    "_filterFields_": [],
+    "_limit_": 2,
+    "_sort_": true,
+    "_type_": "AND",
+    "_output_": "plain",
+    "name": [
+        "mustafa~2",
+        "abdul*"
+    ]
+}
+
+{
+    "_filterFields_": ["name", "aliases"],
+    "_limit_": 10,
+    "_sort_": true,
+    "_type_": "or",
+    "name": [
+        "mustafa~2",
+        "abdul*"
+    ]
+    "aliases":["muha*"]
+}
+
+{
+    "_filterFields_": ["name", "aliases"],
+    "_limit_": 10,
+    "_sort_": true,
+    "_type_": "and",
+    "name": [
+        "mustafa~2"
+    ],
+    "aliases":["muha*"]
+}
+
+{
+    "_filterFields_": [],
+    "_limit_": 10,
+    "_sort_": true,
+    "_type_": "and",
+    "city": [
+        "and*"
+    ]
+}
+
+{
+    "_filterFields_": [],
+    "_limit_": 100,
+    "_sort_": true,
+    "_type_": "and",
+    "city": [
+        "n*"
+    ],
+    "country":["an*"],
+    "subcountry":["za*"]
+}

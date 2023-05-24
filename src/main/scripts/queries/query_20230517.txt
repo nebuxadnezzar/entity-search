@@ -1,0 +1,46 @@
+(+ *:* )
+sort=qvid
+filter_fields=qvid,acc,key,name,address,bank,bank_acc
+collector=p
+limit=15
+paginate
+.
+
+(+ *:* )
+collector=c
+limit=1
+.
+
+(* name:mu* )
+collector=c
+limit=1
+.
+
+(* name:mus* )
+filter_fields=name
+collector=p
+limit=100
+.
+
+(* (* name:mustafa~2) )
+filter_fields=name
+collector=p
+limit=100
+.
+
+(* (* name:mustafa~2) )
+filter_fields=name
+limit=100
+.
+
+(+ (* name:mustafa~2) (* name:abdul*))
+filter_fields=name
+limit=100
+.
+
+( + (* name:mustafa~2 ) (* name:abdul* ) )
+filter_fields=name
+sort=true
+limit=2
+.
+java -cp './bin/ssm.zip:.:..:../..:/home/oo/work/java/lib/*:'  com.dt.scraping.Scraper resources/config.ini  ~/tmp OFAC groovy_scripts/ofac_sdn.groovy

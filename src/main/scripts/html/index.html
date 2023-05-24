@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="utf-8">
+
+    <meta name="viewport" contente="width-device-width,initial-scale=1,shrink-to-fit=no">
+    <title>Data</title>
+
+    | <style>
+        .ag-theme-alpine {
+            --ag-foreground-color: rgb(126, 46, 132);
+            --ag-background-color: rgb(249, 245, 227);
+            --ag-header-foreground-color: rgb(204, 245, 172);
+            --ag-header-background-color: rgb(209, 64, 129);
+            --ag-odd-row-background-color: rgb(0, 0, 0, 0.03);
+            --ag-header-column-resize-handle-color: rgb(126, 46, 132);
+
+            --ag-font-size: 17px;
+            --ag-font-family: monospace;
+        }
+
+        #live-stream-updates-grid .number {
+            text-align: right
+        }
+
+        #live-strean-updates-grid .ag-rov-level-0 {
+            font-weight: bold;
+        }
+
+        #live-stream-updates-grid .ag-row-level-1 {
+            color: lightblue;
+        }
+
+        #live-stream-updates-grid .ag-row-level-2 {
+            color: lightyellow;
+        }
+
+        body {
+            background-color: #333435;
+            color: #ffffff;
+            font-family: Consolas
+        }
+
+        blockquote {
+            background: #000000;
+            border-radius: 5px;
+            margin: 8px 0;
+            height: 180px;
+            overflow-y: auto;
+        }
+
+        blockquote p {
+            padding: 3px;
+            font-family: Verdana, Geneva, Tahoma;
+            font-size: 11pt;
+        }
+
+        [contenteditable='true'] {
+            caret-color: red;
+        }
+
+        #query-input {
+            width: 100%;
+            height: 100%;
+            font-weight: bold;
+            font-size: 11pt;
+            box-sizing: border-box;
+        }
+    </style>
+
+
+
+</head>
+
+<body style="margin-top: 0px;">
+    <div>
+        <input type="hidden" id="data-url">
+        <div id="dataSets" style="display: inline"></div>
+        <button onclick="sendQuery()">Search</button>
+        <blockquote contenteditable="true" style="width: 280px">
+            <textarea id="query-input"></textarea>
+        </blockquote>
+    </div>
+
+    <div class="container-fluid blackish text-light pt-2" id="dashboard-demo">
+
+        <!-- <div id="live-stream-updates-grid" style="height: 700px;" class="ag-theme-balham-dark"></div> -->
+        <div id="live-stream-updates-grid" style="height: 700px;" class="ag-theme-alpine"></div>
+    </div>
+
+    <script>
+
+        var dataSets = [
+            {
+                "name": "select dataset"
+            },
+            {
+                "name": "entity",
+                "columnDefs": [
+                    { "field": "name", "width": 180 },
+                    { "field": "aliases", "width": 180 },
+                    { "field": "_id", "width": 180 }
+                ],
+            },
+            {
+                "name": "cities",
+                "columnDefs": [
+                    { "field": "city", "sortingOrder": ["desc", "asc"], "width": 180 },
+                    { "field": "country", "sortingOrder": ["desc", "asc"], "width": 180 },
+                    { "field": "subcountry", "width": 180 },
+                    { "field": "geonameid", "width": 180 },
+                    { "field": "_id", "width": 180 }]
+            }
+
+        ];
+        var dv = document.getElementById("dataSets");
+        var x = document.createElement("SELECT");
+        x.setAttribute("id", "data-set-select");
+        x.onchange = optOnClick;
+        dv.appendChild(x);
+
+        for (i = 0, k = dataSets.length; i < k; i++) {
+
+            var z = document.createElement("option");
+            //if (i == 0) z.setAttribute("selected", true);
+            if (i > 0) {
+                z.setAttribute("value", "/" + dataSets[i].name + "/");
+            }
+            var t = document.createTextNode(dataSets[i].name);
+            z.appendChild(t);
+            x.appendChild(z);
+        }
+
+        function optOnClick(e) {
+            var opts = this.options;
+            var idx = opts.selectedIndex;
+            if (idx < 1) return;
+            //console.log(this.id)
+            //console.log(idx);
+            //console.log(dataSets[idx].columnDefs);
+            //console.log(opts[idx].value);
+            pushColumnDefs(dataSets[idx].columnDefs);
+            pushDataUrl(opts[idx].value);
+
+        }
+
+        var qi = document.querySelector("#query-input");
+
+        function sendQuery() {
+            //alert(qi.value)
+            pushQuery(JSON.parse(qi.value));
+            clearData();
+            getRowData();
+        }
+
+    </script>
+    <script src='./ag-grid-community.js'></script>
+    <script>
+
+        var input = document.getElementById("url-input");
+        var urlHolder = document.getElementById("data-url");
+        /*
+        input.addEventListener("keyup", function (event) {
+            if (event.keyCode === 13) {
+                event.preventDefault();
+                urlHolder.value = input.value;
+                console.log("INPUT URL: " + urlHolder.value);
+                pushDataUrl(urlHolder.value);
+                pushQuery(dataSets[1].query)
+                pushColumnDefs(dataSets[1].columnDefs);
+                getRowData();
+            }
+        });
+        */
+
+    </script>
+    <script src='./main.js'></script>
+</body>
+
+</html>

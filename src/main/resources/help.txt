@@ -1,0 +1,64 @@
+
+Valid parameters are:
+    server      - indexed data server
+    searcher    - index querying CLI
+    gi          - groovy script intepreter
+
+
+Example:
+
+    java -jar entity-search.jar server server-config.json
+    java -jar entity-search.jar searcher /path/to/index/data/folder/
+    java -jar entity-search.jar gi /path/to/groovy/script
+
+Sample config file for server:
+
+    {
+        "_interface_": {
+            "port": 8080,
+            "host": "127.0.0.1"
+        },
+        "/static": {
+            "headers": [],
+            "content": "/home/oo/test-data/z",
+            "welcomeFile": "t2.txt",
+            "indexHandler": false
+        },
+        "/cities": {
+            "headers": {
+                "Access-Control-Allow-Origin": "*",
+                "Content-type": "application/json;charset=UTF-8",
+                "Transfer-Encoding": "chunked"
+            },
+            "content": "/home/oo/test-data/indexes/ofac",
+            "welcomeFile": "",
+            "indexHandler": true
+        }
+    }
+
+connection config goes under _interface_ section. the rest are endpoints.
+content for index handler points to index folder,
+content for usual html pages points to static content.
+server takes only POST requests for index end points.
+
+Sample query for server:
+
+    {
+        "_filterFields_": ["name"],
+        "_limit_": 2,
+        "_sort_": true,
+        "_type_": "or",
+        "name": [ "mustafa~2", "abdul*", "john" ]
+    }
+
+    _filterFields_  - list of fields to return rather than all document
+    _limit_         - max number of records to return
+    _sort_          - true to sort records (don't use on big datasets)
+    _type_          - query logical type OR or AND - all members either OR'ed or AND'ed
+    anything else that doesn't start with underscore is treated as a field name
+    followed by field values. in example above "name" field will be searched for
+    "mustafa" with a distance 2, "abdul" will be wild card prefix query and "john" will be exact
+    term query. and because it's OR query it's intepreted as:
+    "find anyone whose name is mustafa or abdul or john"
+    AND query will be interpteted as:
+    "find anyone whose name includes mustafa, abdul and john"

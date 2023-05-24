@@ -1,0 +1,24 @@
+<table name="">
+    <field name="entity_id" type="string" index="true" store="true"/>
+    <field name="aliases" type="text" index="true" store="true"/>
+    <field name="soundex" type="text" index="true" store="true" />
+    <field name="stripped_name" type="text" index="true" store="true" />
+    <field name="type" type="text" index="true" store="true" />
+    <field name="active" type="string" index="true" store="true" />
+    <field name="name" type="text" index="true" store="true" />
+    <field name="data_source_id" type="string" index="true" store="true" />
+    <field name="jurisdictions" type="text" index="true" store="true" />
+    <field name="industries" type="text" index="true" store="true" />
+    <field name="industry_codes" type="text" index="true" store="true" />
+    <field name="remarks" type="text" index="true" store="true" />
+    <field name="positions" type="text" index="true" store="true" />
+    <field name="parentOf" type="text" index="true" store="true" />
+    <field name="childOf" type="text" index="true" store="true" />
+    <field name="partnerOf" type="text" index="true" store="true" />
+    <field name="studentOf" type="text" index="true" store="true" />
+    <field name="participantOf" type="text" index="true" store="true" />
+    <field name="employeeOf" type="text" index="true" store="true" />
+    <field name="scrape_name" type="text" index="true" store="true" />
+    <field name="content" type="symbol" index="true" store="true" />
+
+</table>
