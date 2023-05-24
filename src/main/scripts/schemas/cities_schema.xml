@@ -1,4 +1,5 @@
 <table name="">
+    <field name="_id" type="string" index="true" store="true"/>
     <field name="city" type="text" index="true" store="true" sort="true"/>
     <field name="country" type="text" index="true" store="true" sort="true"/>
     <field name="subcountry" type="text" index="true" store="true"/>

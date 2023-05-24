@@ -2,7 +2,7 @@ var dataUrl = null;
 var query = null;
 var gridApi = null;
 var intervalId = null;
-var INTERVAL = 10000;
+var INTERVAL = 30000;
 
 function getRowData(dataUrl) {
     if (!dataUrl) return;

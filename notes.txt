@@ -1,3 +1,10 @@
+# in root pom.xml change <compilerVersion>17</compilerVersion> to 11
+
+# to build rosette with jdk11 use
+   mvn -Denforcer.skip=true clean package
+
+# commands
+
 mvn archetype:generate -DgroupId=com.entity.search -DartifactId=entity-search -DarchetypeArtifactId=maven-archetype-quickstart -DarchetypeVersion=1.4 -DinteractiveMode=false
 
  java -jar bin/entity-search.jar gi src/main/scripts/csv_to_json.groovy src/main/scripts/schemas/cities_csv_to_json.xml skiphdr=y ~/test-data/world-cities.csv ~/test-data/cities.json

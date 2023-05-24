@@ -99,18 +99,18 @@
             {
                 "name": "entity",
                 "columnDefs": [
-                    { "field": "name", "width": 180 },
-                    { "field": "aliases", "width": 180 },
+                    { "field": "name", "width": 300 },
+                    { "field": "aliases", "width": 400 },
                     { "field": "_id", "width": 180 }
                 ],
             },
             {
                 "name": "cities",
                 "columnDefs": [
-                    { "field": "city", "sortingOrder": ["desc", "asc"], "width": 180 },
-                    { "field": "country", "sortingOrder": ["desc", "asc"], "width": 180 },
-                    { "field": "subcountry", "width": 180 },
-                    { "field": "geonameid", "width": 180 },
+                    { "field": "city", "sortingOrder": ["desc", "asc"], "width": 200 },
+                    { "field": "country", "sortingOrder": ["desc", "asc"], "width": 200 },
+                    { "field": "subcountry", "width": 200 },
+                    { "field": "geonameid", "width": 200 },
                     { "field": "_id", "width": 180 }]
             }
 
@@ -137,10 +137,6 @@
             var opts = this.options;
             var idx = opts.selectedIndex;
             if (idx < 1) return;
-            //console.log(this.id)
-            //console.log(idx);
-            //console.log(dataSets[idx].columnDefs);
-            //console.log(opts[idx].value);
             pushColumnDefs(dataSets[idx].columnDefs);
             pushDataUrl(opts[idx].value);
 
@@ -149,7 +145,6 @@
         var qi = document.querySelector("#query-input");
 
         function sendQuery() {
-            //alert(qi.value)
             pushQuery(JSON.parse(qi.value));
             clearData();
             getRowData();

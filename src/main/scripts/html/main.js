@@ -24,7 +24,8 @@
         getRowId: function (params) {
             //console.log("DATA WITH ID: ", params.data._id)
             return params.data._id;
-        }
+        },
+        onCellMouseDown: function (e) { console.log("MOUSE DOWN: ", createIdQuery(e.data._id)) }
     };
 
     var worker;
@@ -85,6 +86,16 @@
         const res = gridOptions.api.applyTransaction({
             remove: rowData,
         });
+    }
+
+    function createIdQuery(id) {
+        var query = {
+            "_filterFields_": [],
+            "_limit_": 2,
+            "_type_": "and"
+        };
+        query._id = [id];
+        return query;
     }
     // if data contains html links they will not work unless renderer is added
     // the simplest renderer just returns data value which could be a link

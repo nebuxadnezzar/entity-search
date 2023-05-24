@@ -20,6 +20,7 @@ class IndexDataHandler extends BaseHandler {
     public static final String LIMIT = "_limit_";
     public static final String SORT = "_sort_";
     public static final String OUTPUT = "_output_";
+    public static final String DOC_ID_PATTERN = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$";
     private boolean DB_DEBUG = false;
 
     public IndexDataHandler(Map<String, Object> config) {
@@ -119,13 +120,15 @@ class IndexDataHandler extends BaseHandler {
         StringBuilder sb = new StringBuilder(String.format("(%s ", queryType));
 
         for (String key : qo.keySet()) {
-            if (key.startsWith("_"))
+            if (key.matches("_\\p{Alpha}+_"))
                 continue;
+
             JSONArray vals = qo.getJSONArray(key);
 
             for (int i = 0, k = vals.length(); i < k; i++) {
                 String val = vals.getString(i);
-                if (StringUtils.validateString("[\\w~*\"\\s\\[\\]\\{\\}]+", val)) {
+                if (StringUtils.validateString("[\\w~*\"\\s\\[\\]\\{\\}]+", val) ||
+                        StringUtils.validateString(DOC_ID_PATTERN, val)) {
                     sb.append(String.format("(* %s:%s ) ", key, URLDecoder.decode(val, "UTF-8")));
                 }
             }

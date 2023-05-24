@@ -72,3 +72,11 @@
     "country":["an*"],
     "subcountry":["za*"]
 }
+
+{
+    "_filterFields_": [],
+    "_limit_": 100,
+    "_sort_": true,
+    "_type_": "and",
+    "_id": ["165ec041-8b40-433d-b3ce-f8886811792b"]
+}
