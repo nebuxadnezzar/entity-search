@@ -2,6 +2,7 @@
 
 # to build rosette with jdk11 use
    mvn -Denforcer.skip=true clean package
+   mvn -Denforcer.skip=true -Dmaven.test.skip=true -Dcheckstyle.skip clean install
 
 # commands
 
