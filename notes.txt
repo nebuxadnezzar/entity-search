@@ -10,5 +10,8 @@ mvn archetype:generate -DgroupId=com.entity.search -DartifactId=entity-search -D
 
  java -jar bin/entity-search.jar gi src/main/scripts/csv_to_json.groovy src/main/scripts/schemas/cities_csv_to_json.xml skiphdr=y ~/test-data/world-cities.csv ~/test-data/cities.json
 
+java -jar bin/entity-search.jar gi src/main/scripts/csv_to_json.groovy src/main/scripts/schemas/person_csv_to_json.xml skiphdr=y ~/test-data/persons.csv ~/test-data/persons.json
+
+
 java -jar bin/entity-search.jar gi src/main/scripts/generic_indexer.groovy  schema_file=src/main/scripts/schemas/cities_schema.xml /home/oo/test-data/cities.json /home/oo/test-data/indexes/cities mode=create
 

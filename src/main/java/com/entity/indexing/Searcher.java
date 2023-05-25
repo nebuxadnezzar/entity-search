@@ -7,9 +7,7 @@ import java.util.*;
 import java.util.regex.*;
 import java.util.AbstractMap.*;
 import org.apache.lucene.document.*;
-import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.Analyzer;
-import org.apache.lucene.analysis.en.EnglishAnalyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.index.*;
 import org.apache.lucene.queryparser.classic.*;
@@ -375,7 +373,7 @@ public class Searcher {
     public SimpleImmutableEntry<Integer, String[]> runCompoundQuery(String[] params, DocumentCollector dc)
             throws IOException, ParseException {
         Matcher matcher = null;
-        String dbPath = null, spoolPath = null;
+        String spoolPath = null;
         Set<String> filterFields = null;
         Sort srt = null;
         int limit = 20;

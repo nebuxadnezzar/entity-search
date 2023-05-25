@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE properties SYSTEM "http://java.sun.com/dtd/properties.dtd">
+<properties>
+<!-- header yes|no . use header to assign field names ... -->
+<entry key="use.header">no</entry>
+
+<!-- ... or define field names here as pipe separated list -->
+<entry key="use.fields">name|address|associates</entry>
+
+<!-- trim column content -->
+<entry key="trim">true</entry>
+
+<!-- field separator could be ommitted, default comma -->
+<entry key="fsep">|</entry>
+
+<!-- record separator could be ommitted, default new line -->
+<entry key="rsep">\n</entry>
+
+</properties>

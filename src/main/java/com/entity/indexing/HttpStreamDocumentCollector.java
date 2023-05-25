@@ -31,7 +31,7 @@ public class HttpStreamDocumentCollector extends DocumentCollector {
         _contentOnlyFlag = SimpleUtils.isNotEmpty(pFilterFields) &&
                 pFilterFields.size() == 1 &&
                 pFilterFields.contains("content");
-        System.out.printf("\n\n!!! CONTENT ONLY FLAG: %s\n\n", _contentOnlyFlag);
+        // System.out.printf("\n\n!!! CONTENT ONLY FLAG: %s\n\n", _contentOnlyFlag);
     }
 
     // -------------------------------------------------------------------------
@@ -146,7 +146,8 @@ public class HttpStreamDocumentCollector extends DocumentCollector {
         //
         if (_numOfDocs == 0) {
             try {
-                DataStreamUtils.sendDataChunk(_os, "],\"count\":\"0\",\"status\":\"OK\"}".getBytes(), _compressFlag);
+                DataStreamUtils.sendDataChunk(_os, (DATA_HEADER + String.format(DATA_FOOTER, 0)).getBytes(),
+                        _compressFlag);
                 DataStreamUtils.sendDataChunk(_os, null, _compressFlag);
             } catch (IOException e) {
                 e.printStackTrace();
