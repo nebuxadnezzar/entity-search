@@ -15,9 +15,8 @@ update persons set id = oid;
 .mode list
 .separator |
 .output persons.csv
-select name, address from persons p, addresses a where p.id = a.id;
+select name, address, persons from associations s, addresses a where s.id = a.id;
 .quit
-
 
 
 with p AS

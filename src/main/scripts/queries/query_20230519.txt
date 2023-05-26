@@ -1,3 +1,5 @@
+#-- entity
+#--
 {
     "_filterFields_":[],
     "_limit_": 100,
@@ -51,6 +53,9 @@
     "aliases":["muha*"]
 }
 
+#-- cities
+#--
+
 {
     "_filterFields_": [],
     "_limit_": 10,
@@ -80,3 +85,62 @@
     "_type_": "and",
     "_id": ["165ec041-8b40-433d-b3ce-f8886811792b"]
 }
+
+#-- persons
+#--
+
+{
+    "_filterFields_": [],
+    "_limit_": 100,
+    "_sort_": true,
+    "_type_": "and",
+    "name": ["moore","gary"]
+}
+
+{
+
+    "_filterFields_": [],
+    "_limit_": 100,
+    "_sort_": true,
+    "_type_": "and",
+    "name": ["elizavet~3"]
+}
+
+{
+    "_filterFields_": [],
+    "_limit_": 100,
+    "_sort_": true,
+    "_type_": "and",
+    "associates": ["brenda"],
+    "name": ["mikhail~3"]
+}
+
+{
+
+    "_filterFields_": [],
+    "_limit_": 100,
+    "_sort_": true,
+    "_type_": "and",
+    "address": ["militon~2"]
+}
+
+#--- associations...
+
+#--- returns brian obrian as name
+{
+    "_filterFields_": [],
+    "_limit_": 100,
+    "_sort_": true,
+    "_type_": "and",
+    "associates": ["brenda", "castaneda"]
+}
+#--- returns adam weber as associate
+{
+    "_filterFields_": [],
+    "_limit_": 100,
+    "_sort_": true,
+    "_type_": "and",
+    "name": ["brenda", "castaneda"]
+}
+#--- adam weber -> clifford underwood -> susan brown -> mariah fleming ->
+

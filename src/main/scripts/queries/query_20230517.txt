@@ -43,4 +43,10 @@ filter_fields=name
 sort=true
 limit=2
 .
+
+(+ (* name:moore) (* name:gary))
+collector=c
+.
+
+
 java -cp './bin/ssm.zip:.:..:../..:/home/oo/work/java/lib/*:'  com.dt.scraping.Scraper resources/config.ini  ~/tmp OFAC groovy_scripts/ofac_sdn.groovy

@@ -8,10 +8,14 @@
 
 mvn archetype:generate -DgroupId=com.entity.search -DartifactId=entity-search -DarchetypeArtifactId=maven-archetype-quickstart -DarchetypeVersion=1.4 -DinteractiveMode=false
 
+java -Ddb.debug=t -jar bin/entity-search.jar server src/main/scripts/config/config.json
+
  java -jar bin/entity-search.jar gi src/main/scripts/csv_to_json.groovy src/main/scripts/schemas/cities_csv_to_json.xml skiphdr=y ~/test-data/world-cities.csv ~/test-data/cities.json
 
 java -jar bin/entity-search.jar gi src/main/scripts/csv_to_json.groovy src/main/scripts/schemas/person_csv_to_json.xml skiphdr=y ~/test-data/persons.csv ~/test-data/persons.json
 
 
 java -jar bin/entity-search.jar gi src/main/scripts/generic_indexer.groovy  schema_file=src/main/scripts/schemas/cities_schema.xml /home/oo/test-data/cities.json /home/oo/test-data/indexes/cities mode=create
+
+java -jar bin/entity-search.jar gi src/main/scripts/generic_indexer.groovy  schema_file=src/main/scripts/schemas/persons_schema.xml /home/oo/test-data/persons.json /home/oo/test-data/indexes/persons mode=create
 

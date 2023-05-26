@@ -60,7 +60,7 @@ def process_file( props, in_file, out_file )
         skip_header = ['yes', 'y' ].contains( named_args[ 'skiphdr' ] ),
         use_header = ['yes', 'y' ].contains( props['use.header']  ) || ! field_str,
         el = [],
-        fm = null;
+        fm = null; /* field map in format where k = field ordinal, v = field name*/
 
     def f = new File( in_file );
 

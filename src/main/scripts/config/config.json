@@ -28,5 +28,21 @@
         "content": "/home/oo/test-data/indexes/cities",
         "welcomeFile": "",
         "indexHandler": true
+    },
+    "/persons": {
+        "headers": {
+            "Access-Control-Allow-Origin": "*",
+            "Content-type": "application/json;charset=UTF-8",
+            "Transfer-Encoding": "chunked"
+        },
+        "content": "/home/oo/test-data/indexes/persons",
+        "welcomeFile": "",
+        "indexHandler": true
+    },
+    "/js-examples": {
+        "headers": [],
+        "content": "/home/oo/work/js",
+        "welcomeFile": "index.html",
+        "indexHandler": false
     }
 }

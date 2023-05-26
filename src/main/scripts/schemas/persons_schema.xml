@@ -1,0 +1,7 @@
+<table name="">
+    <field name="_id" type="string" index="true" store="true"/>
+    <field name="name" type="text" index="true" store="true" sort="true"/>
+    <field name="address" type="text" index="true" store="true" sort="true"/>
+    <field name="associates" type="text" index="true" store="true"/>
+    <field name="content" type="symbol" index="true" store="true" raw="true" />
+</table>

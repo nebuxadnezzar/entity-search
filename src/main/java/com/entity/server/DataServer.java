@@ -130,6 +130,7 @@ public class DataServer {
                 lh.add(ch);
             } else {
                 ResourceHandler rh = new ResourceHandler();
+                rh.setCacheControl("no-cache, no-store, must-revalidate");
                 System.out.printf("\n\n !!! CONTENT PATH %s %s\n\n", contentPath, (String) m.get("welcomeFile"));
                 rh.setWelcomeFiles(new String[] { (String) m.get("welcomeFile") });
                 rh.setAcceptRanges(false);
@@ -137,6 +138,7 @@ public class DataServer {
                     Path webRootPath = new File(contentPath).toPath().toRealPath();
                     rh.setBaseResource(new PathResource(webRootPath));
                     ch.setHandler(rh);
+
                     lh.add(ch);
                 } catch (IOException e) {
                     System.err.printf("\n!!! Failed to locate resource: %s %s\n\n", contentPath, e);
