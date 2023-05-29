@@ -16,7 +16,6 @@
             "Transfer-Encoding": "chunked"
         },
         "content": "/home/oo/test-data/indexes/ofac",
-        "welcomeFile": "",
         "indexHandler": true
     },
     "/cities": {
@@ -36,8 +35,17 @@
             "Transfer-Encoding": "chunked"
         },
         "content": "/home/oo/test-data/indexes/persons",
-        "welcomeFile": "",
         "indexHandler": true
+    },
+    "/convert/entity": {
+        "headers": {
+            "Access-Control-Allow-Origin": "*",
+            "Content-type": "application/json;charset=UTF-8",
+            "Transfer-Encoding": "chunked"
+        },
+        "content": "./src/main/scripts/cgi",
+        "command": "echo '~body~' | node ~script~ ~params~",
+        "cgi": true
     },
     "/js-examples": {
         "headers": [],
