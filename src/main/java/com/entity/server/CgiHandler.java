@@ -3,7 +3,6 @@ package com.entity.server;
 import java.util.*;
 
 import java.io.*;
-import java.nio.*;
 import java.nio.file.Paths;
 
 import org.json.*;
@@ -29,41 +28,31 @@ public class CgiHandler extends BaseHandler {
         System.out.printf("\n!!! CGI SERVLET config: %s\n", config);
         baseRequest.setHandled(true);
 
-        System.out.printf("CONTEXT PATH: %s\nPATH TRANSLATED: %s\nPATH INFO: %s\n", request.getContextPath(),
-                request.getPathTranslated(), request.getPathInfo());
         OutputStream out = response.getOutputStream();
         String body = IOUtils.toString(request.getInputStream(), DEFAULT_CHARSET.name());
         Map<String, String[]> paramMap = request.getParameterMap();
-        JSONObject params = new JSONObject(request.getParameterMap());
+        // JSONObject params = new JSONObject(request.getParameterMap());
         String paramStr = SimpleUtils.mapToParamString(SimpleUtils.convertToSingleValueMap(paramMap));
         String scriptPath = getScriptPath(request.getContextPath());
-        JSONObject responseBody = new JSONObject().append("body", body)
-                .append("params", params).append("paramString", paramStr)
-                .append("scriptPath", scriptPath);
-
+        /*
+         * JSONObject responseBody = new JSONObject().append("body", body)
+         * .append("params", params).append("paramString", paramStr)
+         * .append("scriptPath", scriptPath);
+         */
         setHeaders(response, config);
         run(out, scriptPath, body, paramStr);
-        bytesout(out, responseBody.toString(2).getBytes(DEFAULT_CHARSET));
+        // bytesout(out, responseBody.toString(2).getBytes(DEFAULT_CHARSET));
     }
 
     private void run(OutputStream out, String scriptPath, String body, String params) {
-        String scriptFolder = Paths.get((String) config.get("content")).toAbsolutePath().toString();
+        // String scriptFolder = Paths.get((String)
+        // config.get("content")).toAbsolutePath().toString();
         String cmd = (String) config.get("command");
-        // String[] cmd = createCmdArray(((String) config.get("command")),
-        // scriptPath,body, params);
 
         if (SimpleUtils.isEmpty(cmd)) {
             throw new RuntimeException("cgi command is missing in config");
         }
-        try {/*
-              * ProcessBuilder builder = new ProcessBuilder(cmd);
-              * builder.redirectErrorStream(true);
-              * builder.redirectInput(ProcessBuilder.Redirect.PIPE);
-              * builder.redirectOutput(ProcessBuilder.Redirect.PIPE);
-              * builder.directory(new File(scriptFolder));
-              * // builder.inheritIO();
-              * Process proc = builder.start();
-              */
+        try {
             Process proc = createAndRunProcess(cmd, scriptPath, body, params);
             BufferedReader reader = new BufferedReader(new InputStreamReader(proc.getInputStream()));
 

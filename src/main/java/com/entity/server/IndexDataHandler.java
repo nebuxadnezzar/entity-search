@@ -9,6 +9,7 @@ import org.json.*;
 import com.entity.util.*;
 import com.entity.indexing.*;
 import org.eclipse.jetty.server.*;
+import org.eclipse.jetty.http.MimeTypes;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -41,7 +42,7 @@ class IndexDataHandler extends BaseHandler {
         baseRequest.setHandled(true);
         OutputStream out = response.getOutputStream();
         response.setStatus(HttpServletResponse.SC_OK);
-        response.setContentType(HDR_JSON);
+        response.setContentType(MimeTypes.Type.APPLICATION_JSON.asString());
 
         if (!request.getMethod().equalsIgnoreCase("POST")) {
             response.setStatus(HttpServletResponse.SC_METHOD_NOT_ALLOWED);
@@ -90,18 +91,6 @@ class IndexDataHandler extends BaseHandler {
     }
 
     // -------------------------------------------------------------------------
-    @SuppressWarnings("unchecked")
-    private void setHeaders(HttpServletResponse response, Map<String, Object> config) {
-        Map<String, Object> headers = (Map<String, Object>) config.get("headers");
-
-        if (headers == null || headers.size() < 1)
-            return;
-        for (Map.Entry<String, Object> e : headers.entrySet()) {
-            response.addHeader(e.getKey(), e.getValue().toString());
-        }
-    }
-
-    // -------------------------------------------------------------------------
     private String createQuery(JSONObject qo) throws Exception {
         Map<String, String> parts = new LinkedHashMap<String, String>();
         int limit = 0;
@@ -122,7 +111,6 @@ class IndexDataHandler extends BaseHandler {
         for (String key : qo.keySet()) {
             if (key.matches("_\\p{Alpha}+_"))
                 continue;
-
             JSONArray vals = qo.getJSONArray(key);
 
             for (int i = 0, k = vals.length(); i < k; i++) {

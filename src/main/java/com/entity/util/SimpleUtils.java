@@ -90,6 +90,38 @@ public class SimpleUtils {
         return d;
     }
 
+    // -------------------------------------------------------------------------
+    public static Map<String, String> convertToSingleValueMap(Map<String, String[]> pMap) {
+        Map<String, String> m = new HashMap<String, String>();
+
+        if (SimpleUtils.isEmpty(pMap)) {
+            return m;
+        }
+        for (Map.Entry<String, String[]> e : pMap.entrySet()) {
+            final String s = String.join(",", e.getValue());
+            if (StringUtils.isNotBlank(s)) {
+                m.put(e.getKey(), s);
+            }
+        }
+        return m;
+    }
+
+    // --------------------------------------------------------------------------
+    public static String mapToParamString(Map<String, String> m) {
+        StringBuilder sb = new StringBuilder();
+
+        if (isEmpty(m)) {
+            return sb.toString();
+        }
+        int cnt = 0;
+        for (Map.Entry<String, String> e : m.entrySet()) {
+            sb.append(e.getKey()).append('=').append(e.getValue());
+            if (cnt++ + 1 < m.size())
+                sb.append(' ');
+        }
+        return sb.toString();
+    }
+
     // --------------------------------------------------------------------------
     public static String dateToString(java.util.Date pDate, String pFormat) {
         DateFormat lFormat = new SimpleDateFormat(pFormat);

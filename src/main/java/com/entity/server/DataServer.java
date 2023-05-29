@@ -16,6 +16,8 @@ public class DataServer {
     final private static String DEFAULT_HOST = "127.0.0.1";
     final private static String SERVER_CONF_SECTION = "_interface_";
     final private static String IS_INDEX_HANDLER_SECTION = "indexHandler";
+    final private static String IS_GROOVY_HANDLER_SECTION = "groovy";
+    final private static String IS_CGI_HANDLER_SECTION = "cgi";
     final private static String OPEN_SEARCHERS = "openSearchers";
 
     @SuppressWarnings("unchecked")
@@ -116,9 +118,9 @@ public class DataServer {
 
             endpoints.add(endpoint);
             ch = new ContextHandler(endpoint);
-            System.out.printf("\n !!! %s %s\n", endpoint, isIndexHandler(m));
+            System.out.printf("\n !!! %s %s\n", endpoint, isSpecialHandler(m, IS_CGI_HANDLER_SECTION));
 
-            if (isIndexHandler(m)) {
+            if (isSpecialHandler(m, IS_INDEX_HANDLER_SECTION)) {
                 try {
                     Searcher sr = new Searcher(contentPath, null, true);
                     m.put("searcher", sr);
@@ -127,6 +129,12 @@ public class DataServer {
                     throw new RuntimeException(e);
                 }
                 ch.setHandler(new IndexDataHandler(Collections.unmodifiableMap(m)));
+                lh.add(ch);
+            } else if (isSpecialHandler(m, IS_GROOVY_HANDLER_SECTION)) {
+                ch.setHandler(new GroovyHandler(Collections.unmodifiableMap(m)));
+                lh.add(ch);
+            } else if (isSpecialHandler(m, IS_CGI_HANDLER_SECTION)) {
+                ch.setHandler(new CgiHandler(Collections.unmodifiableMap(m)));
                 lh.add(ch);
             } else {
                 ResourceHandler rh = new ResourceHandler();
@@ -159,10 +167,10 @@ public class DataServer {
         return handlerList;
     }
 
-    private static boolean isIndexHandler(Map<String, Object> config) {
+    private static boolean isSpecialHandler(Map<String, Object> config, String type) {
         if (Objects.isNull(config))
             return false;
-        Object o = config.get(IS_INDEX_HANDLER_SECTION);
+        Object o = config.get(type);
         return !Objects.isNull(o) && o instanceof Boolean && ((Boolean) o).booleanValue();
     }
 

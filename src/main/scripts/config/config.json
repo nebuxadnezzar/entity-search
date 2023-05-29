@@ -44,7 +44,7 @@
             "Transfer-Encoding": "chunked"
         },
         "content": "./src/main/scripts/cgi",
-        "command": "echo '~body~' | node ~script~ ~params~",
+        "command": "echo ~body~ | node ~script~ ~params~",
         "cgi": true
     },
     "/js-examples": {
