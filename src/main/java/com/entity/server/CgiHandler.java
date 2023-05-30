@@ -3,9 +3,7 @@ package com.entity.server;
 import java.util.*;
 
 import java.io.*;
-import java.nio.file.Paths;
 
-import org.json.*;
 import org.eclipse.jetty.server.*;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -31,22 +29,16 @@ public class CgiHandler extends BaseHandler {
         OutputStream out = response.getOutputStream();
         String body = IOUtils.toString(request.getInputStream(), DEFAULT_CHARSET.name());
         Map<String, String[]> paramMap = request.getParameterMap();
-        // JSONObject params = new JSONObject(request.getParameterMap());
+
         String paramStr = SimpleUtils.mapToParamString(SimpleUtils.convertToSingleValueMap(paramMap));
         String scriptPath = getScriptPath(request.getContextPath());
-        /*
-         * JSONObject responseBody = new JSONObject().append("body", body)
-         * .append("params", params).append("paramString", paramStr)
-         * .append("scriptPath", scriptPath);
-         */
+
         setHeaders(response, config);
         run(out, scriptPath, body, paramStr);
-        // bytesout(out, responseBody.toString(2).getBytes(DEFAULT_CHARSET));
     }
 
     private void run(OutputStream out, String scriptPath, String body, String params) {
-        // String scriptFolder = Paths.get((String)
-        // config.get("content")).toAbsolutePath().toString();
+
         String cmd = (String) config.get("command");
 
         if (SimpleUtils.isEmpty(cmd)) {
@@ -106,22 +98,4 @@ public class CgiHandler extends BaseHandler {
         }
         return cmd;
     }
-
-    // the last part of context path is script name so context path should consist
-    // at least of 2 parts
-    // i.e. /abc/bdc or /abc/e/ddd etc.
-    //
-    private String getScriptPath(String contextPath) {
-        String scriptFolder = (String) config.get("content");
-        if (SimpleUtils.isEmpty(scriptFolder)) {
-            throw new RuntimeException("missing content folder");
-        }
-        String[] ss = contextPath.split("\\/", -1);
-        if (ss.length < 2) {
-            throw new RuntimeException("missing cgi script name in context path");
-        }
-        String scriptName = ss[ss.length - 1];
-        return Paths.get(scriptFolder, scriptName).toAbsolutePath().toString();
-    }
-
 }

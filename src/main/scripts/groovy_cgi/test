@@ -1,0 +1,11 @@
+import com.entity.util.*;
+
+def msg = '''
+{"hello":"from groovy"}
+''';
+
+out.println(msg)
+System.out.println("@@@ PARAMS: " + params)
+out.println("${params}")
+System.out.println("@@@ BODY: " + body)
+out.println(body)

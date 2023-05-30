@@ -52,5 +52,14 @@
         "content": "/home/oo/work/js",
         "welcomeFile": "index.html",
         "indexHandler": false
+    },
+    "/groovy/test": {
+        "headers": {
+            "Access-Control-Allow-Origin": "*",
+            "Content-type": "application/json;charset=UTF-8",
+            "Transfer-Encoding": "chunked"
+        },
+        "content": "./src/main/scripts/groovy_cgi",
+        "groovy": true
     }
 }

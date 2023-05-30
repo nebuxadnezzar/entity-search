@@ -2,6 +2,7 @@ package com.entity.server;
 
 import java.io.*;
 import java.nio.charset.Charset;
+import java.nio.file.Paths;
 import java.util.*;
 import org.eclipse.jetty.server.handler.AbstractHandler;
 import org.json.JSONObject;
@@ -11,6 +12,7 @@ import org.eclipse.jetty.server.*;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import com.entity.util.*;
 
 class ServerInfoHandler extends BaseHandler {
 
@@ -73,5 +75,22 @@ class BaseHandler extends AbstractHandler {
         for (Map.Entry<String, Object> e : headers.entrySet()) {
             response.addHeader(e.getKey(), e.getValue().toString());
         }
+    }
+
+    // the last part of context path is script name so context path should consist
+    // at least of 2 parts
+    // i.e. /abc/bdc or /abc/e/ddd etc.
+    //
+    protected String getScriptPath(String contextPath) {
+        String scriptFolder = (String) config.get("content");
+        if (SimpleUtils.isEmpty(scriptFolder)) {
+            throw new RuntimeException("missing content folder");
+        }
+        String[] ss = contextPath.split("\\/", -1);
+        if (ss.length < 2) {
+            throw new RuntimeException("missing cgi script name in context path");
+        }
+        String scriptName = ss[ss.length - 1];
+        return Paths.get(scriptFolder, scriptName).toAbsolutePath().toString();
     }
 }
