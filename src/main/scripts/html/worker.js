@@ -2,12 +2,13 @@ var dataUrl = null;
 var query = null;
 var gridApi = null;
 var intervalId = null;
+var dataSetName = null;
 var INTERVAL = 30000;
 
 function getRowData(dataUrl) {
     if (!dataUrl) return;
     if (intervalId) { clearInterval(intervalId); }
-    sendDataRequest(dataUrl, (data) => { processRowData(data, false); });
+    sendDataRequest(dataUrl, (data) => { data.dataSetName = dataSetName; processRowData(data, false); });
 
     function intervalFunc() {
         sendDataRequest(dataUrl, (data) => { processRowData(data, true); });
@@ -50,6 +51,9 @@ self.addEventListener("message", function (e) {
             console.log("getting data url");
             //console.log(e.data);
             if (e.data.value) { dataUrl = e.data.value; }
+            break;
+        case "setDataSetName":
+            dataSetName = e.data.value;
             break;
         case "setGridApi":
             console.log("setting grid api");

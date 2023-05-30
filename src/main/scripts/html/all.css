@@ -1,0 +1,55 @@
+#mydiv {
+    display: none;
+    position: absolute;
+    overflow: scroll;
+    top: 50px;
+    left: 50px;
+    z-index: 9;
+    background-color: #f1f1f1;
+    text-align: center;
+    border: 1px solid #d3d3d3;
+}
+
+#mydivheader {
+    padding: 2px;
+    position: sticky;
+    padding: 1px;
+    width: 100%;
+    top: 0px;
+    cursor: move;
+    z-index: 10;
+    background-color: rgb(209, 64, 129);
+    color: #fff;
+}
+
+.close {
+    color: white;
+    float: left;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.close:hover,
+.close:focus {
+    color: #000;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+#rr,
+#mydiv {
+
+    width: 860px;
+    height: 500px;
+}
+
+svg {
+    width: auto;
+    height: auto;
+}
+
+svg text {
+    pointer-events: none;
+    transform: scale(.45);
+    font-size: 9px;
+}

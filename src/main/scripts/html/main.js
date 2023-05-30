@@ -141,6 +141,18 @@
         worker.postMessage({ "type": "query", "value": query });
     }
 
+    window.pushDataSetName = function (dataSetName) {
+        worker.postMessage({ "type": "setDataSetName", "value": dataSetName });
+    }
+
+    window.setClickHandler = function (clickHandler) {
+        gridOptions.onCellMouseDown = function (e) {
+            console.log("MOUSE DOWN: ", e.data, "clickHandler ", clickHandler);
+            if (clickHandler) {
+                clickHandler(e.data);
+            }
+        }
+    }
     window.clearData = function () { clearData(); }
 
 })();

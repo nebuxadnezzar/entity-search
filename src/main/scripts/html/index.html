@@ -73,7 +73,7 @@
         }
     </style>
 
-
+    <link rel="stylesheet" href="./all.css" />
 
 </head>
 
@@ -92,8 +92,30 @@
         <!-- <div id="live-stream-updates-grid" style="height: 700px;" class="ag-theme-balham-dark"></div> -->
         <div id="live-stream-updates-grid" style="height: 700px;" class="ag-theme-alpine"></div>
     </div>
-
+    <div id="mydiv">
+        <div id="mydivheader">Details <span class="close">&times;</span></div>
+    </div>
+    <script src="d3.v5.min.js" charset="utf-8"></script>
+    <script src='./converters.js'></script>
+    <script src='./collapsibleTree.js'></script>
     <script>
+        var hierarchyDiv = document.getElementById("mydiv");
+
+        function createClickHandler(converterFunc) {
+
+            return function (data) {
+
+                if (converterFunc) {
+                    var chart = collapsableTree(converterFunc(data, data.name));
+                    var ob = document.createElement("object");
+                    ob.setAttribute("id", "rr");
+                    ob.appendChild(chart);
+                    hierarchyDiv.appendChild(ob);
+                    hierarchyDiv.style.display = "block";
+                }
+            }
+            // convertEntityToMapLists(jsonstr, dataName)
+        }
 
         var dataSets = [
             {
@@ -106,6 +128,7 @@
                     { "field": "aliases", "width": 400 },
                     { "field": "_id", "width": 180 }
                 ],
+                "clickHandler": createClickHandler(convertEntityToMapLists)
             },
             {
                 "name": "cities",
@@ -151,7 +174,8 @@
             if (idx < 1) return;
             pushColumnDefs(dataSets[idx].columnDefs);
             pushDataUrl(opts[idx].value);
-
+            pushDataSetName(dataSets[idx].name);
+            setClickHandler(dataSets[idx].clickHandler)
         }
 
         var qi = document.querySelector("#query-input");
@@ -168,22 +192,68 @@
 
         var input = document.getElementById("url-input");
         var urlHolder = document.getElementById("data-url");
-        /*
-        input.addEventListener("keyup", function (event) {
-            if (event.keyCode === 13) {
-                event.preventDefault();
-                urlHolder.value = input.value;
-                console.log("INPUT URL: " + urlHolder.value);
-                pushDataUrl(urlHolder.value);
-                pushQuery(dataSets[1].query)
-                pushColumnDefs(dataSets[1].columnDefs);
-                getRowData();
-            }
-        });
-        */
 
     </script>
     <script src='./main.js'></script>
+
+    <script>
+        //Make the DIV element draggagle:
+
+        dragElement(hierarchyDiv);
+
+        function dragElement(elmnt) {
+            var pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+            if (document.getElementById(elmnt.id + "header")) {
+                /* if present, the header is where you move the DIV from:*/
+                document.getElementById(elmnt.id + "header").onmousedown = dragMouseDown;
+            } else {
+                /* otherwise, move the DIV from anywhere inside the DIV:*/
+                elmnt.onmousedown = dragMouseDown;
+            }
+
+            function dragMouseDown(e) {
+                e = e || window.event;
+                e.preventDefault();
+                // get the mouse cursor position at startup:
+                pos3 = e.clientX;
+                pos4 = e.clientY;
+                document.onmouseup = closeDragElement;
+                // call a function whenever the cursor moves:
+                document.onmousemove = elementDrag;
+            }
+
+            function elementDrag(e) {
+                e = e || window.event;
+                e.preventDefault();
+                // calculate the new cursor position:
+                pos1 = pos3 - e.clientX;
+                pos2 = pos4 - e.clientY;
+                pos3 = e.clientX;
+                pos4 = e.clientY;
+                // set the element's new position:
+                elmnt.style.top = (elmnt.offsetTop - pos2) + "px";
+                elmnt.style.left = (elmnt.offsetLeft - pos1) + "px";
+            }
+
+            function closeDragElement() {
+                /* stop moving when mouse button is released:*/
+                document.onmouseup = null;
+                document.onmousemove = null;
+            }
+        }
+
+        var span = document.getElementsByClassName("close")[0];
+
+        // When the user clicks on <span> (x), close the modal
+        span.onclick = function () {
+            hierarchyDiv.style.display = "none";
+            document.getElementById("rr").remove();
+        }
+
+
+    </script>
+
+
 </body>
 
 </html>
