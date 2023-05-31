@@ -8,7 +8,7 @@ import java.io.*;
 import java.nio.file.*;
 import java.nio.charset.*;
 import java.util.*;
-
+import com.entity.util.*;
 import com.entity.indexing.*;
 
 public class DataServer {
@@ -29,11 +29,12 @@ public class DataServer {
 
         if (System.getProperty("jetty.home") == null)
             System.setProperty("jetty.home", "./jetty.home");
-        // SimpleUtils.printEnv();
+
+        SimpleUtils.printEnv();
         String json = new String(Files.readAllBytes(Paths.get(args[0])), Charset.forName("UTF8"));
         final Map<String, Object> config = createConfig(json);
-        System.out.println(config);
 
+        System.out.println(config);
         Server server = createServer(config);
         Runtime.getRuntime().addShutdownHook(new Thread() {
             public void run() {

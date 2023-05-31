@@ -114,7 +114,6 @@
                     hierarchyDiv.style.display = "block";
                 }
             }
-            // convertEntityToMapLists(jsonstr, dataName)
         }
 
         var dataSets = [
@@ -147,6 +146,13 @@
                     { "field": "associates", "width": 500 },
                     { "field": "_id", "width": 160 }
                 ],
+            },
+            {
+                "name": "articles",
+                "columnDefs": [
+                    { "field": "title", "width": 300 },
+                    { "field": "article", "width": 700 }
+                ]
             }
 
         ];

@@ -1,0 +1,6 @@
+<table name="">
+    <field name="_id" type="string" index="true" store="true"/>
+    <field name="title" type="text" index="true" store="true" sort="true"/>
+    <field name="article" type="text" index="true" store="true" sort="true"/>
+    <field name="content" type="symbol" index="true" store="true" raw="true" />
+</table>
