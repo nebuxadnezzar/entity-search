@@ -1,3 +1,3 @@
 #!/bin/bash
 
-java -Xmx1100m -cp "./bin/entity-search.jar:$CLASSPATH" com.entity.indexing.Searcher $*
+java -Xmx1100m -jar bin/entity-search.jar searcher $*
