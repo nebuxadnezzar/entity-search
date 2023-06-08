@@ -31,7 +31,7 @@ public class HttpStreamDocumentCollector extends DocumentCollector {
         _contentOnlyFlag = SimpleUtils.isNotEmpty(pFilterFields) &&
                 pFilterFields.size() == 1 &&
                 pFilterFields.contains("content");
-        // System.out.printf("\n\n!!! CONTENT ONLY FLAG: %s\n\n", _contentOnlyFlag);
+        System.out.printf("\n\n!!! CONTENT ONLY FLAG: %s\n\n", _contentOnlyFlag);
     }
 
     // -------------------------------------------------------------------------
@@ -163,6 +163,13 @@ public class HttpStreamDocumentCollector extends DocumentCollector {
 
     // ------------------------------------------------------------------------
     public void closeOutStream() {
-        // this stream will be closed by HTTP handling Worker thread
+        // this stream should be closed by HTTP handling Worker thread
+        if (_os != null) {
+            try {
+                _os.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
     }
 }
