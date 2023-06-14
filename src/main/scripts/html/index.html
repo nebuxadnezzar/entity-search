@@ -116,6 +116,20 @@
             }
         }
 
+        function createClickHandlerNoSVG(converterFunc) {
+
+            return function (data) {
+
+                if (converterFunc) {
+                    //var chart = collapsableTree(converterFunc(data, data.name));
+                    var ob = document.createElement("div");
+                    ob.setAttribute("id", "rr");
+                    //ob.appendChild(chart);
+                    hierarchyDiv.appendChild(ob);
+                    hierarchyDiv.style.display = "block";
+                }
+            }
+        }
         var dataSets = [
             {
                 "name": "select dataset"

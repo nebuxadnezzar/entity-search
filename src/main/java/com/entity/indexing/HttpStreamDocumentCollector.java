@@ -166,6 +166,7 @@ public class HttpStreamDocumentCollector extends DocumentCollector {
         // this stream should be closed by HTTP handling Worker thread
         if (_os != null) {
             try {
+                _os.flush();
                 _os.close();
             } catch (Exception e) {
                 e.printStackTrace();
