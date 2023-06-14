@@ -114,7 +114,7 @@ def to_index( data_list, idxr, schema, id_field, create )
     def doc = null;
     data_list.each
     { e ->
-        e._id = UUID.randomUUID().toString()
+        if(!e._id){ e._id = UUID.randomUUID().toString() }
         schema.each
         { field_name, m ->
             def val = e[ field_name ];

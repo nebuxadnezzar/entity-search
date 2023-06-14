@@ -1,0 +1,6 @@
+<table name="">
+    <field name="_id" type="string" index="true" store="true"/>
+    <field name="name" type="text" index="true" store="false"/>
+    <field name="address" type="text" index="true" store="false"/>
+    <field name="associates" type="text" index="true" store="false"/>
+</table>

@@ -26,4 +26,5 @@ else
     fi
     #mv $(echo $z | sed "s/-[0-9].[0-9]-SNAPSHOT-jar-with-dependencies//i") ${outdir}
     mv ${z} "${outdir}/entity-search.jar"
+    jar uvfm "${outdir}/entity-search.jar" manifest-addition.txt
 fi

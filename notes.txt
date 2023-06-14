@@ -21,4 +21,6 @@ java -jar bin/entity-search.jar gi src/main/scripts/generic_indexer.groovy  sche
 
 java -jar bin/entity-search.jar gi src/main/scripts/generic_indexer.groovy  schema_file=src/main/scripts/schemas/persons_schema.xml ./datasets/persons.json /home/oo/test-data/indexes/persons mode=create
 
+java -jar bin/entity-search.jar gi src/main/scripts/generic_indexer.groovy  schema_file=src/main/scripts/schemas/persons_no_store_schema.xml ./datasets/persons.json /home/oo/test-data/indexes/persons_id mode=create
+
 java -jar bin/entity-search.jar gi src/main/scripts/generic_indexer.groovy  schema_file=src/main/scripts/schemas/articles_schema.xml ./datasets/articles.json /home/oo/test-data/indexes/articles mode=create
