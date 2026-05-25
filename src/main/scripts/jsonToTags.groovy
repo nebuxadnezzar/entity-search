@@ -3,6 +3,7 @@
 import groovy.json.JsonSlurper;
 import org.h2.tools.Server;
 import java.sql.*;
+import java.util.regex.*;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 import java.nio.MappedByteBuffer;
@@ -14,6 +15,13 @@ erro = System.err;
 //this.binding.variables.each { key, value -> erro.println "${key} = ${value}" }
 
 class JsonToTags{
+
+    static List<String> tokenize(String s){
+        return !s ? [] :
+        s.replaceAll("[^\\w\\s]+", ' ').toLowerCase()
+         .replaceAll('\s+(and|y|the|a|d|s|ll|re|ve|your|yours)\s+', ' ')
+         .replaceAll('\s+', ' ').trim().split(' ')
+    }
     static List<String> toTags(String jsonText, boolean sortKeys = false ){
         def root = new JsonSlurper().parseText(jsonText);
         List<String> outList = [];
@@ -34,7 +42,8 @@ class JsonToTags{
             return;
         }
         String value = (node == null) ? "null" : node.toString();
-        outList << (path + value).join(':');
+        tokenize(value).each{ v -> outList << (path + v).join(':')}
+        //outList << (path + value).join(':');
     }
 
     /**
@@ -48,7 +57,8 @@ class JsonToTags{
             if( !line ) return;         // skip blank lines
             int docId = lineNumber - 1; // eachLine is 1-based
             toTags(line, sortKeys).each { tag ->
-                index.computeIfAbsent(tag, { [] }) << docId;
+                //System.err.println("TAG: ${tag}")
+                index.computeIfAbsent(tag.toLowerCase(), { [] }) << docId;
             }
         }
         return index;
@@ -57,68 +67,202 @@ class JsonToTags{
 
 class TagDb {
 
-    private static final String URL = "jdbc:h2:mem:pfxdb;DB_CLOSE_DELAY=-1"
-    private static final String CREATESQL = '''
-    create table if not exists p(pfx text, offs int); CREATE INDEX idx_pfx ON p (pfx);'''
+    private final String [] keys;
+    private final Map<String,intArray> index = [:];
 
-    private static final String INSERTSQL = "insert into p(pfx, offs) values(?, ?)";
-    private Connection _conn;
-    private PreparedStatement _pstm;
-    private Server _websvr;
-
-    public TagDb() {
-        _conn = createDb();
-        _pstm = _conn.prepareStatement(INSERTSQL);
+    public TagDb(Map<String, List<Integer>> indexMap){
+        this.keys = (indexMap.keySet() as String []).sort();
+        indexMap.each { k, v ->
+            index[k] = new intArray(v);
+        }
+        System.err.println("KEYS: ${this.index.size()}")
     }
 
-    public void startWebConsole(String port){
-        _websvr = Server.createWebServer("-webPort", port, "-webAllowOthers");
-        _websvr.start();/*
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            System.err.println("\nShutdown signal received. Stopping H2 Web Server...");
-            if (_websvr != null && _websvr.isRunning(false)) {
-                _websvr.stop();
-                System.err.println("H2 Web Server stopped successfully.");
+    private class intArray{
+        private final int [] offs;
+        private intArray (List<Integer> lst) { offs = lst as int[]; }
+    }
+
+    public int [] search(Map query){
+
+        //def lst = fuzzySearch(keys, "chain:AC?");
+        //System.err.println("FOUND: ${lst}")
+        return searchHelper(query, keys, index);
+    }
+
+    private static int [] searchHelper(Map query, String [] keys, Map<String, intArray> index){
+
+        int [] result;
+        query.each {k, v ->
+
+            v.each { item ->
+                if(item instanceof Map){
+                    System.err.println("ITEM: ${item}")
+                    result = searchHelper(item, keys, index)
+                } else if(item instanceof String) {
+                    System.err.println("SEARCING FOR:${item}")
+                    fuzzySearch(keys, item.toLowerCase()).each { key ->
+                        System.err.println("-> ${key}")
+                        switch(k){
+                            case "and": result = findIntersection(result, index[key].offs); break;
+                            case "or" : result = findUnion(result, index[key].offs); break;
+                        }
+                    }
+                }
             }
-        })); */
-        System.err.println("H2 Web Console started at: " + _websvr.getURL() + "\nUse ${URL} to log in. Type CTRL+C to exit.");
+
+        }
+        //System.err.println("!!! RESULT: ${result}")
+        return result;
     }
 
-    public void insert(String tag, def data) {
-        if(data instanceof List){
-            data.each
-            {i ->
-                _pstm.setString(1, tag);
-                _pstm.setInt(2, i);
-                _pstm.executeUpdate();
+    public static int[] findIntersection(int[] arr1, int[] arr2) {
+        System.err.println("1. FIND INTERSECTION: ${arr1} ${arr2}")
+        if(arr1 == null){ return arr2;}
+        if(arr2 == null){ return arr1;}
+
+        // 1. Sort both arrays to allow two-pointer traversal
+        //Arrays.sort(arr1);
+        //Arrays.sort(arr2);
+
+        int i = 0, j = 0, k = 0;
+        int[] temp = new int[Math.min(arr1.length, arr2.length)];
+
+        // 2. Traverse arrays together
+        while (i < arr1.length && j < arr2.length) {
+            if (arr1[i] < arr2[j]) {
+                i++;
+            } else if (arr1[i] > arr2[j]) {
+                j++;
+            } else {
+                // Found a match. Skip duplicates to ensure distinct results.
+                if (k == 0 || temp[k - 1] != arr1[i]) {
+                    temp[k++] = arr1[i];
+                }
+                i++;
+                j++;
             }
         }
+        System.err.println("2. FIND INTERSECTION: ${temp} ${k}")
+        // 3. Trim the temporary array to the actual number of matched elements
+        return Arrays.copyOf(temp, k);
     }
 
-    public void close(){
-        System.err.println("Closing db...");
-        _pstm.close(); _conn.close();
-        if (_websvr != null && _websvr.isRunning(false)) {
-            _websvr.stop();
-            System.err.println("H2 Web Server stopped successfully.");
+    public static int[] findUnion(int[] arr1, int[] arr2) {
+        System.err.println("1. FIND UNION: ${arr1} ${arr2}")
+        if(arr1 == null){ return arr2;}
+        if(arr2 == null){ return arr1;}
+        int i = 0, j = 0, k = 0;
+
+        // Allocate a temporary array large enough to hold all unique elements
+        int[] temp = new int[arr1.length + arr2.length];
+
+        // Process both arrays using two pointers
+        while (i < arr1.length && j < arr2.length) {
+            if (arr1[i] < arr2[j]) {
+                // Add from arr1 if it's smaller and not a duplicate
+                if (k == 0 || temp[k - 1] != arr1[i]) {
+                    temp[k++] = arr1[i];
+                }
+                i++;
+            } else if (arr2[j] < arr1[i]) {
+                // Add from arr2 if it's smaller and not a duplicate
+                if (k == 0 || temp[k - 1] != arr2[j]) {
+                    temp[k++] = arr2[j];
+                }
+                j++;
+            } else {
+                // Elements are equal; add once and advance both pointers
+                if (k == 0 || temp[k - 1] != arr1[i]) {
+                    temp[k++] = arr1[i];
+                }
+                i++;
+                j++;
+            }
         }
+
+        // Copy remaining elements from arr1, if any
+        while (i < arr1.length) {
+            if (k == 0 || temp[k - 1] != arr1[i]) {
+                temp[k++] = arr1[i];
+            }
+            i++;
+        }
+
+        // Copy remaining elements from arr2, if any
+        while (j < arr2.length) {
+            if (k == 0 || temp[k - 1] != arr2[j]) {
+                temp[k++] = arr2[j];
+            }
+            j++;
+        }
+        System.err.println("2. FIND UNION: ${temp} ${k}")
+        // Trim the temporary array to the exact number of added unique elements
+        return Arrays.copyOf(temp, k);
     }
 
-    static Connection createDb() {
-
-        Connection cnn = DriverManager.getConnection(URL, "sa", "")
-        // Use the connection to initialize the schema
-        cnn.withCloseable { c ->
-            Statement stmt = c.createStatement()
-            stmt.execute(CREATESQL)
-
-            stmt.close()
-            return null // Prevents implicit return of Statement/Boolean to withCloseable
+    public static List<String> fuzzySearch(String[] sortedArray, String wildcardPattern) {
+        List<String> matches = new ArrayList<>();
+        if (sortedArray == null || sortedArray.length == 0 || wildcardPattern == null) {
+            return matches;
         }
 
-        // Re-open or return a fresh connection since withCloseable closes the connection
-        // NOTE: In-memory DB stays alive due to DB_CLOSE_DELAY=-1
-        return DriverManager.getConnection(URL, "sa", "")
+        // 1. Convert Wildcard pattern to standard Java Regex
+        // Escape special regex chars, map '*' to '.*', and '?' to '.'
+        String regex = "^" + Pattern.quote(wildcardPattern)
+                                    .replace('*', "\\E.*\\Q")
+                                    .replace('?', "\\E.\\Q") + '$';
+        // Clean up empty \Q\E blocks caused by substitutions
+        regex = regex.replace("\\Q\\E", "");
+        Pattern pattern = Pattern.compile(regex);
+
+        // 2. Extract a literal leading prefix if the pattern starts with a normal character
+        String prefix = extractLiteralPrefix(wildcardPattern);
+
+        int startIndex = 0;
+        int endIndex = sortedArray.length;
+
+        // 3. Optimization: If there is a fixed prefix, use Binary Search to find the starting bound
+        if (!prefix.isEmpty()) {
+            int searchIdx = Arrays.binarySearch(sortedArray, prefix);
+            if (searchIdx < 0) {
+                // If not found exactly, binarySearch returns (-(insertion point) - 1)
+                startIndex = -searchIdx - 1;
+            } else {
+                startIndex = searchIdx;
+            }
+        }
+
+        // 4. Scan and filter the range
+        for (int i = startIndex; i < endIndex; i++) {
+            String current = sortedArray[i];
+
+            // Optimization: If we have a prefix and the array element no longer starts with it,
+            // we can stop scanning immediately because the array is sorted alphabetically.
+            if (!prefix.isEmpty() && !current.startsWith(prefix)) {
+                break;
+            }
+
+            // Check if the current element satisfies the fuzzy regex
+            if (pattern.matcher(current).matches()) {
+                matches.add(current);
+            }
+        }
+
+        return matches;
+    }
+    /**
+     * Helper to grab any fixed leading characters before a wildcard appears.
+     */
+    private static String extractLiteralPrefix(String pattern) {
+        StringBuilder sb = new StringBuilder();
+        for (char c : pattern.toCharArray()) {
+            if (c == '*' || c == '?') {
+                break;
+            }
+            sb.append(c);
+        }
+        return sb.toString();
     }
 }
 
@@ -184,7 +328,8 @@ void process()
     boolean printData = named_args['print'] && named_args['print'] == "true"
     def fileName = named_args['file'];
     def index = JsonToTags.indexFile(fileName)
-    def db = new TagDb();
+    //def db = new TagDb1();
+    def tdb = new TagDb(index);
     int cnt = 1;
 
     RandomAccessFile raf = new RandomAccessFile(new File(fileName), "r")
@@ -193,14 +338,14 @@ void process()
 
     Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             System.err.println("\nShutdown signal received. Stopping ...");
-            db.close();
+            //db.close();
             erro.println("Closing memory file")
             channel.close();
             raf.close();
         }));
     try{
         index.sort().each { tag, ids ->
-            db.insert(tag, ids);
+            //db.insert(tag, ids);
             if( printData ){print(tag + FLD_SEP); println(ids)}
             if( cnt % 100 == 0 ){ erro.print( "\rtag count: " + cnt ); }
             cnt++
@@ -210,6 +355,8 @@ void process()
         long startTime = System.nanoTime()
         List<Long> offsetIndex = buildLineOffsetIndex(globalMemMap)
         long duration = System.nanoTime() - startTime
+        erro.println "Index generation complete in ${duration / 1_000_000.0} ms."
+        erro.println "Total lines indexed: ${offsetIndex.size()}\n"
 /*
         erro.println "--- Secondary Index Map Layout ---"
         offsetIndex.eachWithIndex { byteOffset, lineNum ->
@@ -217,11 +364,12 @@ void process()
         }
         erro.println ""
         */
-        db.startWebConsole(WEB_PORT);
+
+        //db.startWebConsole(WEB_PORT);
 
         // 4. Instant point-lookups (O(1) complexity lookup)
         erro.println "--- Running O(1) Instant Line Lookups ---"
-
+/*
         // Fetch line 2 instantly
         int targetLineA = 2
         long targetOffsetA = offsetIndex[targetLineA]
@@ -233,6 +381,27 @@ void process()
         long targetOffsetB = offsetIndex[targetLineB]
         erro.println "Fetching line ${targetLineB} from offset ${targetOffsetB}..."
         erro.println "Result: \"${readLineFromOffset(globalMemMap, targetOffsetB)}\"\n"
+*/
+
+        def slurper = new JsonSlurper();
+        ['{"and":["name:*sepol*", "shortName:*sepol*"]}', '{"or":["chain:AC?"]}'].each { s ->
+            def searchResults = tdb.search(slurper.parseText(s));
+            System.err.println("SEARCH RESULT: ${searchResults}")
+            searchResults.each{ n ->
+                long targetOffset = offsetIndex[n]
+                erro.println "Fetching line ${n} from offset ${targetOffset}..."
+                erro.println "Result: \"${readLineFromOffset(globalMemMap, targetOffset)}\"\n"
+            }
+        }
+
+
+        index.values().toList().shuffled().take(3).each {lst ->
+            lst.each{ n ->
+            long targetOffset = offsetIndex[n]
+            erro.println "Fetching line ${n} from offset ${targetOffset}..."
+            erro.println "Result: \"${readLineFromOffset(globalMemMap, targetOffset)}\"\n"
+            }
+        }
 
         while(true){
             try{Thread.sleep(Long.MAX_VALUE);}
