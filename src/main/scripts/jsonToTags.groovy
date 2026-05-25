@@ -98,17 +98,12 @@ class TagDb {
             v.each { item ->
                 if(item instanceof Map){
                     System.err.println("ITEM: ${item}")
-                    result = searchHelper(item, keys, index)
+                    result = setop(k, result, searchHelper(item, keys, index))
                 } else if(item instanceof String) {
                     System.err.println("SEARCING FOR:${item}")
                     fuzzySearch(keys, item.toLowerCase()).each { key ->
                         System.err.println("-> ${key}")
-                        switch(k){
-                            case "and": result = findIntersection(result, index[key].offs); break;
-                            case "or" : result = findUnion(result, index[key].offs); break;
-                            default:
-                                result = findUnion(result, index[key].offs);
-                        }
+                        result = setop(k, result, index[key].offs)
                     }
                 }
             }
@@ -116,6 +111,16 @@ class TagDb {
         }
         //System.err.println("!!! RESULT: ${result}")
         return result;
+    }
+
+    private static int[] setop(String op, int[] arr1, int[] arr2){
+
+        switch(op){
+            case "and": return findIntersection(arr1, arr2);
+            case "or" : return findUnion(arr1, arr2);
+            default:
+                return findUnion(arr1, arr2);
+        }
     }
 
     public static int[] findIntersection(int[] arr1, int[] arr2) {
@@ -361,7 +366,11 @@ void process()
         erro.println "--- Running O(1) Instant Line Lookups ---"
 
         def slurper = new JsonSlurper();
-        ['{"and":["name:sepol*", "shortName:bl*sepol*"]}', '{"or":["chain:AC?", "chain:Ab?y*"]}'].each { s ->
+        [
+            '{"and":["name:sepol*", "shortName:bl*sepol*"]}',
+            '{"or":["chain:AC?", "chain:Ab?y*"]}',
+            '{"or":["chain:Ab?y*", {"and":["name:sepol*", "shortName:bl*sepol*"]}]}'
+        ].each { s ->
             def searchResults = tdb.search(slurper.parseText(s));
             System.err.println("SEARCH RESULT: ${searchResults}")
             searchResults.each{ n ->
