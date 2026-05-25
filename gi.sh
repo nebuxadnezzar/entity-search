@@ -1,5 +1,5 @@
 #!/usr/bin/bash +x
-echo $*
+echo $* >&2
 
 if [ $# -eq 0 ]; then
     echo "path to groovy script is missing"

@@ -106,6 +106,8 @@ class TagDb {
                         switch(k){
                             case "and": result = findIntersection(result, index[key].offs); break;
                             case "or" : result = findUnion(result, index[key].offs); break;
+                            default:
+                                result = findUnion(result, index[key].offs);
                         }
                     }
                 }
@@ -328,9 +330,8 @@ void process()
     boolean printData = named_args['print'] && named_args['print'] == "true"
     def fileName = named_args['file'];
     def index = JsonToTags.indexFile(fileName)
-    //def db = new TagDb1();
     def tdb = new TagDb(index);
-    int cnt = 1;
+    int cnt = 0;
 
     RandomAccessFile raf = new RandomAccessFile(new File(fileName), "r")
     FileChannel channel = raf.getChannel()
@@ -338,14 +339,12 @@ void process()
 
     Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             System.err.println("\nShutdown signal received. Stopping ...");
-            //db.close();
             erro.println("Closing memory file")
             channel.close();
             raf.close();
         }));
     try{
         index.sort().each { tag, ids ->
-            //db.insert(tag, ids);
             if( printData ){print(tag + FLD_SEP); println(ids)}
             if( cnt % 100 == 0 ){ erro.print( "\rtag count: " + cnt ); }
             cnt++
@@ -357,34 +356,12 @@ void process()
         long duration = System.nanoTime() - startTime
         erro.println "Index generation complete in ${duration / 1_000_000.0} ms."
         erro.println "Total lines indexed: ${offsetIndex.size()}\n"
-/*
-        erro.println "--- Secondary Index Map Layout ---"
-        offsetIndex.eachWithIndex { byteOffset, lineNum ->
-            erro.println "Line #${lineNum} starts at byte position: ${byteOffset}"
-        }
-        erro.println ""
-        */
-
-        //db.startWebConsole(WEB_PORT);
 
         // 4. Instant point-lookups (O(1) complexity lookup)
         erro.println "--- Running O(1) Instant Line Lookups ---"
-/*
-        // Fetch line 2 instantly
-        int targetLineA = 2
-        long targetOffsetA = offsetIndex[targetLineA]
-        erro.println "Fetching line ${targetLineA} from offset ${targetOffsetA}..."
-        erro.println "Result: \"${readLineFromOffset(globalMemMap, targetOffsetA)}\"\n"
-
-        // Fetch line 4 instantly
-        int targetLineB = 4
-        long targetOffsetB = offsetIndex[targetLineB]
-        erro.println "Fetching line ${targetLineB} from offset ${targetOffsetB}..."
-        erro.println "Result: \"${readLineFromOffset(globalMemMap, targetOffsetB)}\"\n"
-*/
 
         def slurper = new JsonSlurper();
-        ['{"and":["name:*sepol*", "shortName:*sepol*"]}', '{"or":["chain:AC?"]}'].each { s ->
+        ['{"and":["name:sepol*", "shortName:bl*sepol*"]}', '{"or":["chain:AC?", "chain:Ab?y*"]}'].each { s ->
             def searchResults = tdb.search(slurper.parseText(s));
             System.err.println("SEARCH RESULT: ${searchResults}")
             searchResults.each{ n ->
@@ -439,16 +416,19 @@ CLASSPATH=$CLASSPATH:~/progs/h2/bin/*  gi.sh  ~/work/groovy/jsonToTags.groovy fi
 CLASSPATH="/home/oo/progs/h2/bin/*" ~/progs/groovy-5.0.6/bin/groovy  ~/work/groovy/jsonToTags.groovy file=/home/oo/ephemeral/test.json
  gi.sh  ~/work/groovy/jsonToTags.groovy file=/home/oo/ephemeral/test.json print=true > ~/ephemeral/dump.txt
 
-create alias if not exists to_string for 'com.entity.tools.H2Functions.toString'
-SELECT prefix, to_string(offsets) FROM PFX ;
 */
 
 /*
+import com.sun.net.httpserver.HttpServer
+import java.net.InetSocketAddress
 
-SELECT p1.pfx, p2.pfx, p2.offs
-FROM p p1, p p2 use index (idx_pfx)
- where p1.pfx like 'parent:type:L%'
-and  p2.pfx like 'name:A%'
-and p1.offs = p2.offs
+def server = HttpServer.create(new InetSocketAddress(8080), 0)
+server.createContext("/") { exchange ->
+    def response = "Hello from Groovy!"
+    exchange.sendResponseHeaders(200, response.length())
+    exchange.responseBody.withWriter { out -> out << response }
+}
+server.start()
+println "Server started on port 8080"
 
 */
