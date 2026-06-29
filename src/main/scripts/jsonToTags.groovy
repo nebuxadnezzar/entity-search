@@ -1,9 +1,11 @@
 #!/usr/bin/env groovy
 
 import groovy.json.JsonSlurper;
-import org.h2.tools.Server;
 import java.sql.*;
 import java.util.regex.*;
+import com.sun.net.httpserver.HttpServer;
+import java.net.InetSocketAddress;
+import java.util.concurrent.*;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 import java.nio.MappedByteBuffer;
@@ -94,17 +96,21 @@ class TagDb {
 
         int [] result;
         query.each {k, v ->
-
+            System.err.println("${k} -> ${v}")
             v.each { item ->
                 if(item instanceof Map){
                     System.err.println("ITEM: ${item}")
                     result = setop(k, result, searchHelper(item, keys, index))
                 } else if(item instanceof String) {
                     System.err.println("SEARCING FOR:${item}")
+                    def tmp = [];
                     fuzzySearch(keys, item.toLowerCase()).each { key ->
                         System.err.println("-> ${key}")
-                        result = setop(k, result, index[key].offs)
+                        //result = setop(k, result, index[key].offs)
+                        tmp.addAll(index[key].offs)
+                        //System.err.println "\nTMP: ${tmp}"
                     }
+                    result = setop(k, result, tmp as int[])
                 }
             }
 
@@ -273,6 +279,107 @@ class TagDb {
     }
 }
 
+class HttpSvr {
+
+    private int port = 8080
+    private Closure onPost;
+    private ExecutorService pool = determineExecutor()
+    private HttpServer server = HttpServer.create(new InetSocketAddress(port), 0)
+
+    public HttpSvr(int port, Closure onPost){
+        this.port = port;
+        this.onPost = onPost;
+        init();
+    }
+    // 1. Determine the best available executor service at runtime
+    ExecutorService determineExecutor() {
+        if (Executors.metaClass.respondsTo(Executors, "newVirtualThreadPerTaskExecutor")) {
+            System.err.println "JDK 21+ detected. Using Virtual Thread pool."
+            return Executors.newVirtualThreadPerTaskExecutor()
+        } else {
+            System.err.println "Older JDK detected. Falling back to Cached Thread pool."
+            return Executors.newCachedThreadPool()
+        }
+    }
+
+    private void init(){
+        server.with {
+            setExecutor(pool)
+
+            createContext("/hello") { exchange ->
+                byte[] response = "Hello from a safe, resilient server!".getBytes()
+                exchange.responseHeaders.add("Content-Type", "text/plain")
+                exchange.sendResponseHeaders(200, response.length)
+                exchange.responseBody.withStream { out -> out.write(response) }
+            }
+
+            createContext("/q") { exchange ->
+                if ("POST".equalsIgnoreCase(exchange.requestMethod)) {
+
+                    // 2. Read the request body stream safely using withStream
+                    def requestBody = ""
+                    exchange.requestBody.withStream { stream ->
+                        requestBody = stream.text // Groovy extension to easily read stream to String
+                    }
+
+                    System.err.println "Received POST Data: ${requestBody}"
+
+                    // 3. Prepare the response
+                    def responseText = "Data received successfully!"
+
+                    def headers = exchange.responseHeaders
+                    headers.set("Content-Type", "application/json; charset=UTF-8")
+
+                    // send data in transfer chunks setting content length to 0 (chunked transfer)
+                    exchange.sendResponseHeaders(200, 0)
+
+                    // 4. Write the response body stream safely using withStream
+                    exchange.responseBody.withStream { outStream ->
+                        if(onPost){
+                            onPost(requestBody, outStream)
+                        } else {
+                            outStream.write(responseText.getBytes("UTF-8"))
+                        }
+                    }
+                } else {
+                    // Method Not Allowed
+                    exchange.sendResponseHeaders(405, -1)
+                }
+            }
+        }
+
+        // 2. Register the JVM Shutdown Hook
+        Runtime.getRuntime().addShutdownHook(new Thread({
+           shutdown();
+        }))
+    }
+
+    public void shutdown(){
+        System.err.println "\nShutdown signal received. Commencing graceful shutdown of HTTP Server..."
+
+            // Stop the HTTP server immediately (0 second delay for new requests)
+            server.stop(0)
+            System.err.println "HTTP server stopped."
+
+            // Disable new tasks from being submitted to the pool
+            pool.shutdown()
+
+            try {
+                // Wait up to 5 seconds for existing active tasks to finish
+                if (!pool.awaitTermination(5, TimeUnit.SECONDS)) {
+                    System.err.println "Tasks did not finish in time. Forcing pool shutdown..."
+                    pool.shutdownNow() // Cancel currently executing tasks
+                }
+            } catch (InterruptedException ie) {
+                pool.shutdownNow()
+                Thread.currentThread().interrupt()
+            }
+
+        println "Shutdown complete. Goodbye."
+    }
+    public void start(){server.start();}
+    public void stop(){shutdown();}
+}
 /**
  * Builds a fast secondary index map tracking line numbers to byte position offsets.
  */
@@ -343,10 +450,10 @@ void process()
     MappedByteBuffer globalMemMap = channel.map(FileChannel.MapMode.READ_ONLY, 0, channel.size())
 
     Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            System.err.println("\nShutdown signal received. Stopping ...");
             erro.println("Closing memory file")
             channel.close();
             raf.close();
+
         }));
     try{
         index.sort().each { tag, ids ->
@@ -364,23 +471,39 @@ void process()
 
         // 4. Instant point-lookups (O(1) complexity lookup)
         erro.println "--- Running O(1) Instant Line Lookups ---"
-
         def slurper = new JsonSlurper();
+        def processingClosure = {String query, OutputStream os ->
+            def searchResults = tdb.search(slurper.parseText(query));
+            def sz = searchResults.length
+            System.err.println("SEARCH RESULT: ${searchResults}")
+            os.write("{\"count\":${sz},\"data\":[".getBytes('UTF-8'))
+            searchResults.eachWithIndex{ n, idx ->
+                long targetOffset = offsetIndex[n]
+                System.err.println "\nFetching line ${n} from offset ${targetOffset}..."
+                def data = readLineFromOffset(globalMemMap, targetOffset);
+                //System.err.println "Result: \"${data}\"\n"
+                os.write(data.getBytes("UTF-8"))
+                if(idx + 1 < sz) {os.write(44)}; os.write(10)
+            }
+            os.write("]}".getBytes('UTF-8'))
+        }
+
         [
             '{"and":["name:sepol*", "shortName:bl*sepol*"]}',
             '{"or":["chain:AC?", "chain:Ab?y*"]}',
             '{"or":["chain:Ab?y*", {"and":["name:sepol*", "shortName:bl*sepol*"]}]}'
-        ].each { s ->
+        ].each { s -> /*
             def searchResults = tdb.search(slurper.parseText(s));
             System.err.println("SEARCH RESULT: ${searchResults}")
             searchResults.each{ n ->
                 long targetOffset = offsetIndex[n]
                 erro.println "Fetching line ${n} from offset ${targetOffset}..."
                 erro.println "Result: \"${readLineFromOffset(globalMemMap, targetOffset)}\"\n"
-            }
+            }*/
+            processingClosure(s, erro)
         }
 
-
+/*
         index.values().toList().shuffled().take(3).each {lst ->
             lst.each{ n ->
             long targetOffset = offsetIndex[n]
@@ -388,11 +511,16 @@ void process()
             erro.println "Result: \"${readLineFromOffset(globalMemMap, targetOffset)}\"\n"
             }
         }
-
+*/
+        HttpSvr svr = new HttpSvr(WEB_PORT.toInteger(), processingClosure);
+        erro.println("Starting HTTP sever")
+        svr.start();
+/*
         while(true){
             try{Thread.sleep(Long.MAX_VALUE);}
             catch(Exception e){erro.println("Exiting server thread"); break}
         }
+*/
     } finally {
         erro.println("FINALLY BLOCK CALLED")
     }
@@ -430,14 +558,64 @@ CLASSPATH="/home/oo/progs/h2/bin/*" ~/progs/groovy-5.0.6/bin/groovy  ~/work/groo
 /*
 import com.sun.net.httpserver.HttpServer
 import java.net.InetSocketAddress
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
-def server = HttpServer.create(new InetSocketAddress(8080), 0)
-server.createContext("/") { exchange ->
-    def response = "Hello from Groovy!"
-    exchange.sendResponseHeaders(200, response.length())
-    exchange.responseBody.withWriter { out -> out << response }
+// 1. Determine the best available executor service at runtime
+ExecutorService determineExecutor() {
+    if (Executors.metaClass.respondsTo(Executors, "newVirtualThreadPerTaskExecutor")) {
+        println "JDK 21+ detected. Using Virtual Thread pool."
+        return Executors.newVirtualThreadPerTaskExecutor()
+    } else {
+        println "Older JDK detected. Falling back to Cached Thread pool."
+        return Executors.newCachedThreadPool()
+    }
 }
+
+int port = 8080
+ExecutorService pool = determineExecutor()
+HttpServer server = HttpServer.create(new InetSocketAddress(port), 0)
+
+server.with {
+    setExecutor(pool)
+
+    createContext("/hello") { exchange ->
+        byte[] response = "Hello from a safe, resilient server!".getBytes()
+        exchange.responseHeaders.add("Content-Type", "text/plain")
+        exchange.sendResponseHeaders(200, response.length)
+        exchange.responseBody.withStream { out -> out.write(response) }
+    }
+}
+
+// 2. Register the JVM Shutdown Hook
+Runtime.getRuntime().addShutdownHook(new Thread({
+    println "\nShutdown signal received. Commencing graceful shutdown..."
+
+    // Stop the HTTP server immediately (0 second delay for new requests)
+    server.stop(0)
+    println "HTTP server stopped."
+
+    // Disable new tasks from being submitted to the pool
+    pool.shutdown()
+
+    try {
+        // Wait up to 5 seconds for existing active tasks to finish
+        if (!pool.awaitTermination(5, TimeUnit.SECONDS)) {
+            println "Tasks did not finish in time. Forcing pool shutdown..."
+            pool.shutdownNow() // Cancel currently executing tasks
+        }
+    } catch (InterruptedException ie) {
+        pool.shutdownNow()
+        Thread.currentThread().interrupt()
+    }
+
+    println "Shutdown complete. Goodbye."
+}))
+
+// Start the server after configuring the hook
 server.start()
-println "Server started on port 8080"
+println "Server running on port ${port}. Press Ctrl+C to test graceful shutdown."
+
 
 */
