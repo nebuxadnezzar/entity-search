@@ -108,6 +108,7 @@ class TagDb {
                         System.err.println("-> ${key}")
                         //result = setop(k, result, index[key].offs)
                         tmp.addAll(index[key].offs)
+                        tmp.sort()
                         //System.err.println "\nTMP: ${tmp}"
                     }
                     result = setop(k, result, tmp as int[])
@@ -492,14 +493,7 @@ void process()
             '{"and":["name:sepol*", "shortName:bl*sepol*"]}',
             '{"or":["chain:AC?", "chain:Ab?y*"]}',
             '{"or":["chain:Ab?y*", {"and":["name:sepol*", "shortName:bl*sepol*"]}]}'
-        ].each { s -> /*
-            def searchResults = tdb.search(slurper.parseText(s));
-            System.err.println("SEARCH RESULT: ${searchResults}")
-            searchResults.each{ n ->
-                long targetOffset = offsetIndex[n]
-                erro.println "Fetching line ${n} from offset ${targetOffset}..."
-                erro.println "Result: \"${readLineFromOffset(globalMemMap, targetOffset)}\"\n"
-            }*/
+        ].each { s ->
             processingClosure(s, erro)
         }
 
