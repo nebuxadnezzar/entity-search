@@ -106,11 +106,11 @@ class TagDb {
                     def tmp = [];
                     fuzzySearch(keys, item.toLowerCase()).each { key ->
                         System.err.println("-> ${key}")
-                        //result = setop(k, result, index[key].offs)
                         tmp.addAll(index[key].offs)
                         tmp.sort()
                         //System.err.println "\nTMP: ${tmp}"
                     }
+                    System.err.println "\nTMP: ${tmp}"
                     result = setop(k, result, tmp as int[])
                 }
             }
@@ -123,7 +123,7 @@ class TagDb {
     private static int[] setop(String op, int[] arr1, int[] arr2){
 
         switch(op){
-            case "and": return findIntersection(arr1, arr2);
+            case "and": return findIntersectionInPlace(arr1, arr2); //findIntersection(arr1, arr2); //
             case "or" : return findUnion(arr1, arr2);
             default:
                 return findUnion(arr1, arr2);
@@ -131,7 +131,7 @@ class TagDb {
     }
 
     public static int[] findIntersection(int[] arr1, int[] arr2) {
-        System.err.println("1. FIND INTERSECTION: ${arr1} ${arr2}")
+        //System.err.println("1. FIND INTERSECTION: ${arr1} ${arr2}")
         if(arr1 == null){ return arr2;}
         if(arr2 == null){ return arr1;}
 
@@ -157,13 +157,40 @@ class TagDb {
                 j++;
             }
         }
-        System.err.println("2. FIND INTERSECTION: ${temp} ${k}")
+        //System.err.println("2. FIND INTERSECTION: ${temp} ${k}")
         // 3. Trim the temporary array to the actual number of matched elements
         return Arrays.copyOf(temp, k);
     }
 
+    public static int[] findIntersectionInPlace(int[] arr1, int[] arr2) {
+        if(arr1 == null){ return arr2;}
+        if(arr2 == null){ return arr1;}
+
+        int i = 0, j = 0, k = 0;
+
+        // Traverse arrays together using two pointers
+        while (i < arr1.length && j < arr2.length) {
+            if (arr1[i] < arr2[j]) {
+                i++;
+            } else if (arr1[i] > arr2[j]) {
+                j++;
+            } else {
+                // Found a match. Skip duplicates.
+                // Check against our in-place boundary 'k' inside arr1
+                if (k == 0 || arr1[k - 1] != arr1[i]) {
+                    arr1[k++] = arr1[i]; // Overwrite arr1 in-place
+                }
+                i++;
+                j++;
+            }
+        }
+        // System.err.println("2. FIND INTERSECTION IN PLACE: ${arr1} ${k}")
+        // Trim and return only the intersection slice of arr1
+        return Arrays.copyOf(arr1, k);
+    }
+
     public static int[] findUnion(int[] arr1, int[] arr2) {
-        System.err.println("1. FIND UNION: ${arr1} ${arr2}")
+        //System.err.println("1. FIND UNION: ${arr1} ${arr2}")
         if(arr1 == null){ return arr2;}
         if(arr2 == null){ return arr1;}
         int i = 0, j = 0, k = 0;
@@ -210,7 +237,7 @@ class TagDb {
             }
             j++;
         }
-        System.err.println("2. FIND UNION: ${temp} ${k}")
+        //System.err.println("2. FIND UNION: ${temp} ${k}")
         // Trim the temporary array to the exact number of added unique elements
         return Arrays.copyOf(temp, k);
     }
@@ -490,9 +517,7 @@ void process()
         }
 
         [
-            '{"and":["name:sepol*", "shortName:bl*sepol*"]}',
-            '{"or":["chain:AC?", "chain:Ab?y*"]}',
-            '{"or":["chain:Ab?y*", {"and":["name:sepol*", "shortName:bl*sepol*"]}]}'
+            '{"and":["name:sepol*", "shortName:bl*sepol*"]}'
         ].each { s ->
             processingClosure(s, erro)
         }
@@ -546,5 +571,13 @@ jq -c '.[] ' ~/test-data/chainlist.json > ~/ephemeral/test.json
 CLASSPATH=$CLASSPATH:~/progs/h2/bin/*  gi.sh  ~/work/groovy/jsonToTags.groovy file=/home/oo/ephemeral/test.json > ~/ephemeral/dump.txt
 CLASSPATH="/home/oo/progs/h2/bin/*" ~/progs/groovy-5.0.6/bin/groovy  ~/work/groovy/jsonToTags.groovy file=/home/oo/ephemeral/test.json
  gi.sh  ~/work/groovy/jsonToTags.groovy file=/home/oo/ephemeral/test.json print=true > ~/ephemeral/dump.txt
+
+*/
+
+/* queries
+
+{"or":["chain:Ab?y*", "name:ze*", {"and":["name:so*", "name:can*"]}]}
+{"or":["chain:AC?", "chain:Ab?y*"]}',
+{"or":["chain:Ab?y*", {"and":["name:sepol*", "shortName:bl*sepol*"]}]}'
 
 */
