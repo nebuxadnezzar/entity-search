@@ -10,6 +10,8 @@ import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 import java.nio.MappedByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.LocalTime;
 
 FLD_SEP = "\t";
 WEB_PORT = "9090";
@@ -94,6 +96,7 @@ class TagDb {
 
     private static int [] searchHelper(Map query, String [] keys, Map<String, intArray> index){
 
+        long startTime = System.currentTimeMillis()
         int [] result;
         query.each {k, v ->
             System.err.println("${k} -> ${v}")
@@ -107,10 +110,11 @@ class TagDb {
                     fuzzySearch(keys, item.toLowerCase()).each { key ->
                         System.err.println("-> ${key}")
                         tmp.addAll(index[key].offs)
-                        tmp.sort()
                         //System.err.println "\nTMP: ${tmp}"
                     }
-                    System.err.println "\nTMP: ${tmp}"
+                    System.err.println( "fuzzy.search complete in ${System.currentTimeMillis() - startTime}")
+                    tmp.sort()
+                    //System.err.println "\nTMP: ${tmp}"
                     result = setop(k, result, tmp as int[])
                 }
             }
@@ -459,6 +463,13 @@ static String readLineFromOffset(MappedByteBuffer buffer, long offset)
     return result.endsWith('\r') ? result.substring(0, result.length() - 1) : result
 }
 
+static String msformatted(long ms)
+{
+    // Create a local time starting at midnight and add the milliseconds
+    LocalTime time = LocalTime.MIDNIGHT.plus(Duration.ofMillis(ms))
+    // Format it exactly as MM:ss.SSS
+    return time.format(java.time.format.DateTimeFormatter.ofPattern("mm:ss.SSS"))
+}
 
 void process()
 {
@@ -469,6 +480,7 @@ void process()
 
     boolean printData = named_args['print'] && named_args['print'] == "true"
     def fileName = named_args['file'];
+    def port = named_args['port'] && named_args['port'].isNumber() ? named_args['port'].toInteger() : WEB_PORT.toInteger()
     def index = JsonToTags.indexFile(fileName)
     def tdb = new TagDb(index);
     int cnt = 0;
@@ -501,27 +513,34 @@ void process()
         erro.println "--- Running O(1) Instant Line Lookups ---"
         def slurper = new JsonSlurper();
         def processingClosure = {String query, OutputStream os ->
+            startTime = System.nanoTime()
             def searchResults = tdb.search(slurper.parseText(query));
+            //erro.println "tdb.search complete in ${(System.nanoTime() - startTime)/1_000_000.0}"
+            erro.println "tdb.search complete in ${msformatted(((System.nanoTime() - startTime)/1_000_000.0).toLong())}"
+
             def sz = searchResults.length
-            System.err.println("SEARCH RESULT: ${searchResults}")
+            erro.println("SEARCH RESULT: ${searchResults}")
             os.write("{\"count\":${sz},\"data\":[".getBytes('UTF-8'))
+            startTime = System.nanoTime();
             searchResults.eachWithIndex{ n, idx ->
                 long targetOffset = offsetIndex[n]
-                System.err.println "\nFetching line ${n} from offset ${targetOffset}..."
+                //erro.println "\nFetching line ${n} from offset ${targetOffset}..."
                 def data = readLineFromOffset(globalMemMap, targetOffset);
                 //System.err.println "Result: \"${data}\"\n"
                 os.write(data.getBytes("UTF-8"))
                 if(idx + 1 < sz) {os.write(44)}; os.write(10)
             }
+            erro.println "mem map records retrieval complete in ${(System.nanoTime() - startTime)/1_000_000.0}"
+            // erro.println "mem map records retrieval complete in ${msformatted((long)(System.nanoTime() - startTime)/1_000_000.0)}"
             os.write("]}".getBytes('UTF-8'))
         }
-
+/*
         [
             '{"and":["name:sepol*", "shortName:bl*sepol*"]}'
         ].each { s ->
             processingClosure(s, erro)
         }
-
+*/
 /*
         index.values().toList().shuffled().take(3).each {lst ->
             lst.each{ n ->
@@ -531,8 +550,8 @@ void process()
             }
         }
 */
-        HttpSvr svr = new HttpSvr(WEB_PORT.toInteger(), processingClosure);
-        erro.println("Starting HTTP sever")
+        HttpSvr svr = new HttpSvr(port, processingClosure);
+        erro.println("Starting HTTP sever on port ${port}")
         svr.start();
 /*
         while(true){
@@ -540,6 +559,9 @@ void process()
             catch(Exception e){erro.println("Exiting server thread"); break}
         }
 */
+    } catch(Exception e){
+        System.err.println("EXCEPTION: ${e.getMessage()}")
+        e.printStackTrace();
     } finally {
         erro.println("FINALLY BLOCK CALLED")
     }
