@@ -1,7 +1,6 @@
 #!/usr/bin/env groovy
 
-import groovy.json.JsonSlurper;
-import java.sql.*;
+import groovy.json.*;
 import java.util.regex.*;
 import com.sun.net.httpserver.HttpServer;
 import java.net.InetSocketAddress;
@@ -10,8 +9,8 @@ import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 import java.nio.MappedByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
-import java.time.LocalTime;
+import java.util.stream.Collectors;
+import java.time.*;
 
 FLD_SEP = "\t";
 WEB_PORT = "9090";
@@ -50,9 +49,6 @@ class JsonToTags{
         //outList << (path + value).join(':');
     }
 
-    /**
-
-    */
     static Map<String, List<Integer>> indexFile( String filePath, boolean sortKeys = false) {
         Map<String,List<Integer>> index = [:];
         new File(filePath).eachLine
@@ -73,6 +69,7 @@ class TagDb {
 
     private final String [] keys;
     private final Map<String,intArray> index = [:];
+    private static final ForkJoinPool pool = new ForkJoinPool(Runtime.runtime.availableProcessors())
 
     public TagDb(Map<String, List<Integer>> indexMap){
         this.keys = (indexMap.keySet() as String []).sort();
@@ -88,10 +85,50 @@ class TagDb {
     }
 
     public int [] search(Map query){
+        return searchHelperMultiThreaded(query, keys, index);
+    }
 
-        //def lst = fuzzySearch(keys, "chain:AC?");
-        //System.err.println("FOUND: ${lst}")
-        return searchHelper(query, keys, index);
+    private static int [] searchHelperMultiThreaded(Map query, String [] keys, Map<String, intArray> index)
+    {
+        int [] result = null;
+
+        query.each { k, v ->
+            // Separate items into maps (recursive) and strings (fuzzy search)
+            def subQueries = v.findAll { it instanceof Map }
+            def searchStrings = v.findAll { it instanceof String }
+
+            System.err.printf("\nSUBQUERIES: ${subQueries}\n")
+            System.err.printf("SEARCHES: ${searchStrings}\n")
+
+            // 1. Run recursive sub-queries directly on the CURRENT thread (No future overhead)
+            subQueries.each { item ->
+                int[] subResult = searchHelperMultiThreaded(item, keys, index)
+                result = setop(k, result, subResult)
+            }
+
+            // 2. Parallelize the heavy string fuzzy searches using Java Parallel Streams
+            if (!searchStrings.isEmpty()) {
+                // Run inside custom ForkJoinPool to control parallelism
+                List<int[]> parallelResults = pool.submit({ ->
+                    searchStrings.parallelStream().map { item ->
+                        def tmp = []
+                        fuzzySearch(keys, item.toLowerCase()).each { key ->
+                            tmp.addAll(index[key].offs)
+                        }
+                        // Sort inside the parallel thread
+                        tmp.sort()
+                        return tmp as int[]
+                    }.collect(Collectors.toList())
+                }).get()
+
+                // 3. Merge the parallel results back sequentially
+                parallelResults.each { taskResult ->
+                    result = setop(k, result, taskResult)
+                }
+            }
+        }
+
+        return result
     }
 
     private static int [] searchHelper(Map query, String [] keys, Map<String, intArray> index){
@@ -105,10 +142,10 @@ class TagDb {
                     System.err.println("ITEM: ${item}")
                     result = setop(k, result, searchHelper(item, keys, index))
                 } else if(item instanceof String) {
-                    System.err.println("SEARCING FOR:${item}")
+                    System.err.println("SEARCHING FOR:${item}")
                     def tmp = [];
                     fuzzySearch(keys, item.toLowerCase()).each { key ->
-                        System.err.println("-> ${key}")
+                        //System.err.println("-> ${key}")
                         tmp.addAll(index[key].offs)
                         //System.err.println "\nTMP: ${tmp}"
                     }
@@ -125,7 +162,7 @@ class TagDb {
     }
 
     private static int[] setop(String op, int[] arr1, int[] arr2){
-
+        System.err.println("...applying ${op}");
         switch(op){
             case "and": return findIntersectionInPlace(arr1, arr2); //findIntersection(arr1, arr2); //
             case "or" : return findUnion(arr1, arr2);
@@ -347,35 +384,55 @@ class HttpSvr {
 
             createContext("/q") { exchange ->
                 if ("POST".equalsIgnoreCase(exchange.requestMethod)) {
-
-                    // 2. Read the request body stream safely using withStream
-                    def requestBody = ""
-                    exchange.requestBody.withStream { stream ->
-                        requestBody = stream.text // Groovy extension to easily read stream to String
-                    }
-
-                    System.err.println "Received POST Data: ${requestBody}"
-
-                    // 3. Prepare the response
-                    def responseText = "Data received successfully!"
-
-                    def headers = exchange.responseHeaders
-                    headers.set("Content-Type", "application/json; charset=UTF-8")
-
-                    // send data in transfer chunks setting content length to 0 (chunked transfer)
-                    exchange.sendResponseHeaders(200, 0)
-
-                    // 4. Write the response body stream safely using withStream
-                    exchange.responseBody.withStream { outStream ->
-                        if(onPost){
-                            onPost(requestBody, outStream)
-                        } else {
-                            outStream.write(responseText.getBytes("UTF-8"))
+                    try
+                    {
+                        // 2. Read the request body stream safely using withStream
+                        def requestBody = ""
+                        exchange.requestBody.withStream { stream ->
+                            requestBody = stream.text // Groovy extension to easily read stream to String
                         }
+
+                        System.err.println "Received POST Data: ${requestBody}"
+
+                        // 3. Prepare the response
+                        def responseText = "Data received successfully!"
+
+                        def headers = exchange.responseHeaders
+                        headers.set("Content-Type", "application/json; charset=UTF-8")
+
+                        // 4. Write the response body stream safely using withStream
+                        if(onPost){
+                            try{
+
+
+                            new JsonSlurper().parseText(requestBody)
+                            // CRITICAL CHANGE: Send the headers ONLY when ready to write the body
+                            exchange.sendResponseHeaders(200, 0)
+                            exchange.responseBody.withStream { outStream -> onPost(requestBody, outStream) }
+                            } catch(IllegalArgumentException | JsonException ea){
+                                System.err.println("@@@ Bad Request Error: ${ea.message}")
+                                sendErrorResponse(exchange, 400, "Bad request: ${ea.message}")
+                            } catch(Throwable e){
+                                System.err.println("@@@@@@ Internal Server Error occurred:")
+                                org.codehaus.groovy.runtime.StackTraceUtils.sanitize(e).printStackTrace(System.err)
+                                sendErrorResponse(exchange, 500, "Internal Server Error: ${e.message}")
+                            }
+                        } else {
+                            // Send explicit content length instead of chunked (0) when possible
+                            exchange.sendResponseHeaders(200, responseBytes.length)
+                            exchange.responseBody.withStream { outStream -> outStream.write(responseText.getBytes("UTF-8"))}
+                        }
+                    } catch(Throwable e){
+                        System.err.println("!!!!!!!!!! Internal Server Error occurred:")
+                        org.codehaus.groovy.runtime.StackTraceUtils.sanitize(e).printStackTrace(System.err)
+                        //e.printStackTrace(System.err)
+                        sendErrorResponse(exchange, 500, "Internal Server Error: ${e.message}")
+
+                        throw e;
                     }
                 } else {
                     // Method Not Allowed
-                    exchange.sendResponseHeaders(405, -1)
+                    sendErrorResponse(exchange, 405, "Method not allowed. POST only.")
                 }
             }
         }
@@ -384,6 +441,26 @@ class HttpSvr {
         Runtime.getRuntime().addShutdownHook(new Thread({
            shutdown();
         }))
+    }
+
+    private void sendErrorResponse(com.sun.net.httpserver.HttpExchange exchange, int statusCode, String description) {
+        try {
+            // 1. Convert description to a safe byte array (GStringImpl friendly)
+            byte[] responseBytes = description.toString().getBytes("UTF-8")
+
+            // 2. Set the Content-Type header so the client knows it's text
+            exchange.getResponseHeaders().set("Content-Type", "text/plain; charset=UTF-8")
+
+            // 3. Send the status code along with the fixed body length
+            exchange.sendResponseHeaders(statusCode, responseBytes.length)
+
+            // 4. Stream the actual description text out
+            exchange.getResponseBody().withStream { outStream ->
+                outStream.write(responseBytes)
+            }
+        } catch (Exception fatal) {
+            System.err.println("Fatal: Could not transmit error status down socket: ${fatal.message}")
+        }
     }
 
     public void shutdown(){
@@ -503,36 +580,37 @@ void process()
         }
         erro.print( "\rtag count: " + cnt-1  + "\n");
 
-        long startTime = System.nanoTime()
+        long startTime = System.currentTimeMillis()
         List<Long> offsetIndex = buildLineOffsetIndex(globalMemMap)
-        long duration = System.nanoTime() - startTime
-        erro.println "Index generation complete in ${duration / 1_000_000.0} ms."
+        erro.println "Index generation complete in ${System.currentTimeMillis() - startTime} ms."
         erro.println "Total lines indexed: ${offsetIndex.size()}\n"
 
         // 4. Instant point-lookups (O(1) complexity lookup)
-        erro.println "--- Running O(1) Instant Line Lookups ---"
-        def slurper = new JsonSlurper();
         def processingClosure = {String query, OutputStream os ->
-            startTime = System.nanoTime()
-            def searchResults = tdb.search(slurper.parseText(query));
-            //erro.println "tdb.search complete in ${(System.nanoTime() - startTime)/1_000_000.0}"
-            erro.println "tdb.search complete in ${msformatted(((System.nanoTime() - startTime)/1_000_000.0).toLong())}"
+            try{
+                startTime = System.currentTimeMillis()
+                def searchResults = tdb.search(new JsonSlurper().parseText(query));
+                erro.println "tdb.search complete in ${msformatted(System.currentTimeMillis() - startTime)}"
 
-            def sz = searchResults.length
-            erro.println("SEARCH RESULT: ${searchResults}")
-            os.write("{\"count\":${sz},\"data\":[".getBytes('UTF-8'))
-            startTime = System.nanoTime();
-            searchResults.eachWithIndex{ n, idx ->
-                long targetOffset = offsetIndex[n]
-                //erro.println "\nFetching line ${n} from offset ${targetOffset}..."
-                def data = readLineFromOffset(globalMemMap, targetOffset);
-                //System.err.println "Result: \"${data}\"\n"
-                os.write(data.getBytes("UTF-8"))
-                if(idx + 1 < sz) {os.write(44)}; os.write(10)
+                def sz = searchResults.length
+                //erro.println("SEARCH RESULT: ${searchResults}")
+                os.write("{\"data\":[".getBytes('UTF-8'))
+                startTime = System.currentTimeMillis();
+                searchResults.eachWithIndex{ n, idx ->
+                    long targetOffset = offsetIndex[n]
+                    //erro.println "\nFetching line ${n} from offset ${targetOffset}..."
+                    def data = readLineFromOffset(globalMemMap, targetOffset);
+                    //System.err.println "Result: \"${data}\"\n"
+                    os.write(data.getBytes("UTF-8"))
+                    if(idx + 1 < sz) {os.write(44)}; os.write(10)
+                }
+                erro.println "mem map records retrieval complete in ${msformatted(System.currentTimeMillis() - startTime)}"
+                os.write("],\n\"count\":${sz}}".getBytes('UTF-8'))
+            }catch(Throwable e){
+                System.err.printf("\n!!! in processingClosure: %s\n", e.getMessage())
+                e.printStackTrace(System.err);
+                throw e;
             }
-            erro.println "mem map records retrieval complete in ${(System.nanoTime() - startTime)/1_000_000.0}"
-            // erro.println "mem map records retrieval complete in ${msformatted((long)(System.nanoTime() - startTime)/1_000_000.0)}"
-            os.write("]}".getBytes('UTF-8'))
         }
 /*
         [
@@ -593,7 +671,7 @@ jq -c '.[] ' ~/test-data/chainlist.json > ~/ephemeral/test.json
 CLASSPATH=$CLASSPATH:~/progs/h2/bin/*  gi.sh  ~/work/groovy/jsonToTags.groovy file=/home/oo/ephemeral/test.json > ~/ephemeral/dump.txt
 CLASSPATH="/home/oo/progs/h2/bin/*" ~/progs/groovy-5.0.6/bin/groovy  ~/work/groovy/jsonToTags.groovy file=/home/oo/ephemeral/test.json
  gi.sh  ~/work/groovy/jsonToTags.groovy file=/home/oo/ephemeral/test.json print=true > ~/ephemeral/dump.txt
-
+cls; gi.sh  ~/work/groovy/jsonToTags.groovy file=/home/oo/ephemeral/ev.json print=true port=9091 > ~/ephemeral/dump1.txt
 */
 
 /* queries
@@ -601,5 +679,5 @@ CLASSPATH="/home/oo/progs/h2/bin/*" ~/progs/groovy-5.0.6/bin/groovy  ~/work/groo
 {"or":["chain:Ab?y*", "name:ze*", {"and":["name:so*", "name:can*"]}]}
 {"or":["chain:AC?", "chain:Ab?y*"]}',
 {"or":["chain:Ab?y*", {"and":["name:sepol*", "shortName:bl*sepol*"]}]}'
-
+{"and":["vin:*135*",{"and": ["city:*e*", "city:*s*",{"or":["utility:*nn*", "utility:*ge*"]}]}, "postal-code:98*"] }
 */
