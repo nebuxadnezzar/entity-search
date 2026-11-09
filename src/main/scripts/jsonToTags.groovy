@@ -11,22 +11,144 @@ import java.nio.MappedByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.stream.Collectors;
 import java.time.*;
+import java.util.concurrent.atomic.AtomicInteger
 
 FLD_SEP = "\t";
 WEB_PORT = "9090";
 erro = System.err;
 //this.binding.variables.each { key, value -> erro.println "${key} = ${value}" }
 
+
+class JsonToTags {
+
+    private static final JsonSlurper SLURPER = new JsonSlurper()
+
+    private static final Set<String> STOP_WORDS = [
+        'and', 'y', 'the', 'a', 'd', 's', 'll', 're', 've', 'your', 'yours'
+    ] as Set
+
+    static List<String> toTags(String jsonText, boolean sortKeys = false) {
+        def root = SLURPER.parseText(jsonText)
+        List<String> outList = []
+        // Performance Fix: Use a single reusable StringBuilder instead of creating endless Lists
+        StringBuilder pathBuffer = new StringBuilder()
+        walk(root, pathBuffer, outList, sortKeys)
+        return outList
+    }
+
+    private static void walk(def node, StringBuilder pathBuffer, List<String> outList, boolean sortKeys) {
+        if (node instanceof Map) {
+            def entries = sortKeys ? node.entrySet().sort { it.key.toString() } : node.entrySet()
+            int originalLength = pathBuffer.length()
+
+            entries.each { entry ->
+                String key = entry.key.toString().toLowerCase()
+
+                // Append key to path stack
+                if (originalLength > 0) pathBuffer.append((char)':')
+                pathBuffer.append(key)
+
+                walk(entry.value, pathBuffer, outList, sortKeys)
+
+                // Rollback path stack buffer to its exact state before this branch
+                pathBuffer.setLength(originalLength)
+            }
+            return
+        }
+        if (node instanceof List) {
+            node.each { item -> walk(item, pathBuffer, outList, sortKeys) }
+            return
+        }
+
+        // Leaf Node: Append the processed tokens directly to the existing path prefix
+        String value = (node == null) ? "null" : node.toString()
+        int prefixLength = pathBuffer.length()
+
+        tokenizeToTags(value, pathBuffer, outList, prefixLength)
+    }
+
+    /**
+     * Inline Tokenizer that pushes finished tags straight to outList,
+     * entirely eliminating the middleman List<String> creation from tokenize().
+     */
+    private static void tokenizeToTags(String s, StringBuilder pathBuffer, List<String> outList, int prefixLength) {
+        if (!s) return
+
+        int len = s.length()
+        StringBuilder currentToken = new StringBuilder()
+
+        for (int i = 0; i < len; i++) {
+            char ch = s.charAt(i)
+
+            if (Character.isLetterOrDigit(ch) || ch == (char)'_') {
+                currentToken.append(Character.toLowerCase(ch))
+            } else {
+                if (currentToken.length() > 0) {
+                    String token = currentToken.toString()
+                    if (!STOP_WORDS.contains(token)) {
+                        addTag(pathBuffer, token, outList, prefixLength)
+                    }
+                    currentToken.setLength(0)
+                }
+            }
+        }
+
+        if (currentToken.length() > 0) {
+            String token = currentToken.toString()
+            if (!STOP_WORDS.contains(token)) {
+                addTag(pathBuffer, token, outList, prefixLength)
+            }
+        }
+    }
+
+    private static void addTag(StringBuilder pathBuffer, String token, List<String> outList, int prefixLength) {
+        if (prefixLength > 0) pathBuffer.append((char)':')
+        pathBuffer.append(token)
+
+        outList.add(pathBuffer.toString())
+
+        // Reset back to original prefix length for the next token
+        pathBuffer.setLength(prefixLength)
+    }
+
+    static Map<String, List<Integer>> indexFile(String filePath, boolean sortKeys = false) {
+        Map<String, List<Integer>> index = [:]
+        new File(filePath).eachLine { line, lineNumber ->
+            line = line.trim()
+            if (!line) return
+            int docId = lineNumber - 1
+
+            toTags(line, sortKeys).each { tag ->
+                index.computeIfAbsent(tag, { [] }) << docId
+            }
+        }
+        return index
+    }
+}
+
+
+/*
 class JsonToTags{
 
+    private static final Pattern NON_ALPHANUMERIC = ~/[^\w\s]+/
+    private static final Pattern STOP_WORDS       = ~/\s+(and|y|the|a|d|s|ll|re|ve|your|yours)\s+/
+    private static final Pattern MULTI_SPACE      = ~/\s+/
+    private static final Pattern SPACE            = ~/\s/
+
+    private JsonSlurper slurper = new JsonSlurper();
+
     static List<String> tokenize(String s){
-        return !s ? [] :
-        s.replaceAll("[^\\w\\s]+", ' ').toLowerCase()
-         .replaceAll('\s+(and|y|the|a|d|s|ll|re|ve|your|yours)\s+', ' ')
-         .replaceAll('\s+', ' ').trim().split(' ')
+        if (!s) return []
+        return s.replaceAll(NON_ALPHANUMERIC, ' ')
+                .toLowerCase()
+                .replaceAll(STOP_WORDS, ' ')
+                .replaceAll(MULTI_SPACE, ' ')
+                .trim()
+                .split(' ') as List<String>;
     }
-    static List<String> toTags(String jsonText, boolean sortKeys = false ){
-        def root = new JsonSlurper().parseText(jsonText);
+
+    private List<String> toTags(String jsonText, boolean sortKeys = false ){
+        def root = slurper.parseText(jsonText);
         List<String> outList = [];
         walk(root, [], outList, sortKeys)
         return outList;
@@ -49,7 +171,7 @@ class JsonToTags{
         //outList << (path + value).join(':');
     }
 
-    static Map<String, List<Integer>> indexFile( String filePath, boolean sortKeys = false) {
+    public Map<String, List<Integer>> indexFile( String filePath, boolean sortKeys = false) {
         Map<String,List<Integer>> index = [:];
         new File(filePath).eachLine
         { line, lineNumber ->
@@ -64,7 +186,7 @@ class JsonToTags{
         return index;
     }
 }
-
+*/
 class TagDb {
 
     private final String [] keys;
@@ -93,6 +215,7 @@ class TagDb {
         int [] result = null;
 
         query.each { k, v ->
+            System.err.println("${k} -> ${v}")
             // Separate items into maps (recursive) and strings (fuzzy search)
             def subQueries = v.findAll { it instanceof Map }
             def searchStrings = v.findAll { it instanceof String }
@@ -109,10 +232,12 @@ class TagDb {
             // 2. Parallelize the heavy string fuzzy searches using Java Parallel Streams
             if (!searchStrings.isEmpty()) {
                 // Run inside custom ForkJoinPool to control parallelism
+                System.err.println("HERE!!!!")
                 List<int[]> parallelResults = pool.submit({ ->
                     searchStrings.parallelStream().map { item ->
                         def tmp = []
                         fuzzySearch(keys, item.toLowerCase()).each { key ->
+                            System.err.println("-> ${key}")
                             tmp.addAll(index[key].offs)
                         }
                         // Sort inside the parallel thread
@@ -558,8 +683,14 @@ void process()
     boolean printData = named_args['print'] && named_args['print'] == "true"
     def fileName = named_args['file'];
     def port = named_args['port'] && named_args['port'].isNumber() ? named_args['port'].toInteger() : WEB_PORT.toInteger()
-    def index = JsonToTags.indexFile(fileName)
+    erro.println("Starting indexing...")
+    long startTime = System.currentTimeMillis()
+
+    def index = new JsonToTags().indexFile(fileName)
+    erro.println "JsonToTags.indexFile completed in ${msformatted(System.currentTimeMillis() - startTime)} ms."
+    startTime = System.currentTimeMillis()
     def tdb = new TagDb(index);
+    erro.println "TagDb creation completed in ${msformatted(System.currentTimeMillis() - startTime)} ms."
     int cnt = 0;
 
     RandomAccessFile raf = new RandomAccessFile(new File(fileName), "r")
@@ -572,6 +703,9 @@ void process()
             raf.close();
 
         }));
+
+    startTime = System.currentTimeMillis()
+
     try{
         index.sort().each { tag, ids ->
             if( printData ){print(tag + FLD_SEP); println(ids)}
@@ -580,9 +714,8 @@ void process()
         }
         erro.print( "\rtag count: " + cnt-1  + "\n");
 
-        long startTime = System.currentTimeMillis()
         List<Long> offsetIndex = buildLineOffsetIndex(globalMemMap)
-        erro.println "Index generation complete in ${System.currentTimeMillis() - startTime} ms."
+        erro.println "Memory mapped access index generation complete in ${msformatted(System.currentTimeMillis() - startTime)} ms."
         erro.println "Total lines indexed: ${offsetIndex.size()}\n"
 
         // 4. Instant point-lookups (O(1) complexity lookup)
@@ -604,7 +737,7 @@ void process()
                     os.write(data.getBytes("UTF-8"))
                     if(idx + 1 < sz) {os.write(44)}; os.write(10)
                 }
-                erro.println "mem map records retrieval complete in ${msformatted(System.currentTimeMillis() - startTime)}"
+                //erro.println "mem map records retrieval complete in ${msformatted(System.currentTimeMillis() - startTime)}"
                 os.write("],\n\"count\":${sz}}".getBytes('UTF-8'))
             }catch(Throwable e){
                 System.err.printf("\n!!! in processingClosure: %s\n", e.getMessage())
