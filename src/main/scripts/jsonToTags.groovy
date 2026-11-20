@@ -15,6 +15,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 FLD_SEP = "\t";
 WEB_PORT = "9090";
+KEYS = "_keys_";
 erro = System.err;
 //this.binding.variables.each { key, value -> erro.println "${key} = ${value}" }
 
@@ -206,6 +207,28 @@ class TagDb {
         private intArray (List<Integer> lst) { offs = lst as int[]; }
     }
 
+    public String [] getKeys(){return keys;}
+
+    public List<String> keySearch(List keyPatterns)
+    {
+        if(!keyPatterns.isEmpty())
+        {
+            List<String> parallelResults = pool.submit({ ->
+                   keyPatterns.parallelStream().map { item ->
+                        def tmp = [] as Set
+                        fuzzySearch(keys, item.toLowerCase()).each { key ->
+                            //System.err.println("---> ${key}")
+                            tmp.add(key)
+                        }
+                        // Sort inside the parallel thread
+                        return tmp
+                    }.collect(Collectors.toList())
+                }).get()
+            return parallelResults.stream().flatMap(Set::stream).collect(Collectors.toList());
+        }
+        return [];
+    }
+
     public int [] search(Map query){
         return searchHelperMultiThreaded(query, keys, index);
     }
@@ -232,7 +255,6 @@ class TagDb {
             // 2. Parallelize the heavy string fuzzy searches using Java Parallel Streams
             if (!searchStrings.isEmpty()) {
                 // Run inside custom ForkJoinPool to control parallelism
-                System.err.println("HERE!!!!")
                 List<int[]> parallelResults = pool.submit({ ->
                     searchStrings.parallelStream().map { item ->
                         def tmp = []
@@ -413,6 +435,63 @@ class TagDb {
         if (sortedArray == null || sortedArray.length == 0 || wildcardPattern == null) {
             return matches;
         }
+        boolean negPatternPresent = wildcardPattern.startsWith("!");
+        if( negPatternPresent){ wildcardPattern = wildcardPattern.substring(1);}
+
+        // 1. Convert Wildcard pattern to standard Java Regex
+        // Escape special regex chars, map '*' to '.*', and '?' to '.'
+        String regex = wildcardPattern.replace('*', ".*").replace('?', ".");
+
+        if( negPatternPresent){ regex = '(?!' + regex + '$).*'; }
+;
+        regex = '^' + regex + '$';
+
+        //println("REGEX: ${regex}")
+        Pattern pattern = Pattern.compile(regex);
+
+        // 2. Extract a literal leading prefix if the pattern starts with a normal character
+        String prefix = extractLiteralPrefix(wildcardPattern);
+        //println("PREFIX: ${prefix}")
+
+        int startIndex = 0;
+        int endIndex = sortedArray.length;
+
+        // 3. Optimization: If there is a fixed prefix, use Binary Search to find the starting bound
+        if (!prefix.isEmpty() && !negPatternPresent) {
+            int searchIdx = Arrays.binarySearch(sortedArray, prefix);
+            if (searchIdx < 0) {
+                // If not found exactly, binarySearch returns (-(insertion point) - 1)
+                startIndex = -searchIdx - 1;
+            } else {
+                startIndex = searchIdx;
+            }
+        }
+
+        // 4. Scan and filter the range
+        for (int i = startIndex; i < endIndex; i++) {
+            String current = sortedArray[i];
+            //println("CURRENT: ${i} ${current}")
+
+            // Optimization: If we have a prefix and the array element no longer starts with it,
+            // we can stop scanning immediately because the array is sorted alphabetically.
+            if (!negPatternPresent && !prefix.isEmpty() && !current.startsWith(prefix)) {
+                break;
+            }
+
+            // Check if the current element satisfies the fuzzy regex
+            if (pattern.matcher(current).matches()) {
+                matches.add(current);
+            }
+        }
+
+        return matches;
+    }
+/*
+    public static List<String> fuzzySearch(String[] sortedArray, String wildcardPattern) {
+        List<String> matches = new ArrayList<>();
+        if (sortedArray == null || sortedArray.length == 0 || wildcardPattern == null) {
+            return matches;
+        }
 
         // 1. Convert Wildcard pattern to standard Java Regex
         // Escape special regex chars, map '*' to '.*', and '?' to '.'
@@ -458,6 +537,7 @@ class TagDb {
 
         return matches;
     }
+*/
     /**
      * Helper to grab any fixed leading characters before a wildcard appears.
      */
@@ -476,13 +556,13 @@ class TagDb {
 class HttpSvr {
 
     private int port = 8080
-    private Closure onPost;
+    private Closure onRequest;
     private ExecutorService pool = determineExecutor()
     private HttpServer server = HttpServer.create(new InetSocketAddress(port), 0)
 
-    public HttpSvr(int port, Closure onPost){
+    public HttpSvr(int port, Closure onRequest){
         this.port = port;
-        this.onPost = onPost;
+        this.onRequest = onRequest;
         init();
     }
     // 1. Determine the best available executor service at runtime
@@ -507,6 +587,30 @@ class HttpSvr {
                 exchange.responseBody.withStream { out -> out.write(response) }
             }
 
+            createContext("/k"){ exchange ->
+                try{
+                    if(onRequest)
+                    {
+                       exchange.sendResponseHeaders(200, 0)
+                       if("POST".equalsIgnoreCase(exchange.requestMethod))
+                       {
+                          def requestBody = ""
+                          exchange.requestBody.withStream { stream ->
+                              requestBody = stream.text
+                          }
+                          exchange.responseBody.withStream { outStream -> onRequest("KEYS", requestBody, outStream)}
+                       }
+                       else {exchange.responseBody.withStream { outStream -> onRequest("KEYS", "*", outStream) }}
+                    }
+                } catch( Throwable e){
+                    System.err.println("!!!!!!!!!! Internal Server Error occurred:")
+                    org.codehaus.groovy.runtime.StackTraceUtils.sanitize(e).printStackTrace(System.err)
+                    //e.printStackTrace(System.err)
+                    sendErrorResponse(exchange, 500, "Internal Server Error: ${e.message}")
+                    throw e;
+                }
+            }
+
             createContext("/q") { exchange ->
                 if ("POST".equalsIgnoreCase(exchange.requestMethod)) {
                     try
@@ -526,14 +630,12 @@ class HttpSvr {
                         headers.set("Content-Type", "application/json; charset=UTF-8")
 
                         // 4. Write the response body stream safely using withStream
-                        if(onPost){
+                        if(onRequest){
                             try{
-
-
-                            new JsonSlurper().parseText(requestBody)
-                            // CRITICAL CHANGE: Send the headers ONLY when ready to write the body
-                            exchange.sendResponseHeaders(200, 0)
-                            exchange.responseBody.withStream { outStream -> onPost(requestBody, outStream) }
+                                new JsonSlurper().parseText(requestBody)
+                                // CRITICAL CHANGE: Send the headers ONLY when ready to write the body
+                                exchange.sendResponseHeaders(200, 0)
+                                exchange.responseBody.withStream { outStream -> onRequest("VALUES", requestBody, outStream) }
                             } catch(IllegalArgumentException | JsonException ea){
                                 System.err.println("@@@ Bad Request Error: ${ea.message}")
                                 sendErrorResponse(exchange, 400, "Bad request: ${ea.message}")
@@ -719,9 +821,20 @@ void process()
         erro.println "Total lines indexed: ${offsetIndex.size()}\n"
 
         // 4. Instant point-lookups (O(1) complexity lookup)
-        def processingClosure = {String query, OutputStream os ->
+        def onRequestClosure = {String queryType, String query, OutputStream os ->
             try{
                 startTime = System.currentTimeMillis()
+
+                if(queryType == "KEYS")
+                {
+                    //def ks = tdb.getKeys();
+                    def ks = query == "*" ? tdb.getKeys() : tdb.keySearch(new JsonSlurper().parseText(query));
+                    os.write("{\"data\":".getBytes('UTF-8'));
+                    os.write( JsonOutput.toJson(ks).getBytes('UTF-8'));
+                    os.write(",\n\"count\":${ks.size()}}".getBytes('UTF-8'));
+                    return;
+                }
+
                 def searchResults = tdb.search(new JsonSlurper().parseText(query));
                 erro.println "tdb.search complete in ${msformatted(System.currentTimeMillis() - startTime)}"
 
@@ -740,7 +853,7 @@ void process()
                 //erro.println "mem map records retrieval complete in ${msformatted(System.currentTimeMillis() - startTime)}"
                 os.write("],\n\"count\":${sz}}".getBytes('UTF-8'))
             }catch(Throwable e){
-                System.err.printf("\n!!! in processingClosure: %s\n", e.getMessage())
+                System.err.printf("\n!!! in onRequestClosure: %s\n", e.getMessage())
                 e.printStackTrace(System.err);
                 throw e;
             }
@@ -749,7 +862,7 @@ void process()
         [
             '{"and":["name:sepol*", "shortName:bl*sepol*"]}'
         ].each { s ->
-            processingClosure(s, erro)
+            onRequestClosure(s, erro)
         }
 */
 /*
@@ -761,7 +874,7 @@ void process()
             }
         }
 */
-        HttpSvr svr = new HttpSvr(port, processingClosure);
+        HttpSvr svr = new HttpSvr(port, onRequestClosure);
         erro.println("Starting HTTP sever on port ${port}")
         svr.start();
 /*
