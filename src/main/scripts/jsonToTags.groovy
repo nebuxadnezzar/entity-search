@@ -259,7 +259,7 @@ class TagDb {
                     searchStrings.parallelStream().map { item ->
                         def tmp = []
                         fuzzySearch(keys, item.toLowerCase()).each { key ->
-                            System.err.println("-> ${key}")
+                            //System.err.println("-> ${key}")
                             tmp.addAll(index[key].offs)
                         }
                         // Sort inside the parallel thread
@@ -311,7 +311,7 @@ class TagDb {
     private static int[] setop(String op, int[] arr1, int[] arr2){
         System.err.println("...applying ${op}");
         switch(op){
-            case "and": return findIntersectionInPlace(arr1, arr2); //findIntersection(arr1, arr2); //
+            case "and": return findIntersectionInPlaceBS(arr1, arr2); //findIntersectionInPlace(arr1, arr2); //findIntersection(arr1, arr2); //
             case "or" : return findUnion(arr1, arr2);
             default:
                 return findUnion(arr1, arr2);
@@ -348,6 +348,26 @@ class TagDb {
         //System.err.println("2. FIND INTERSECTION: ${temp} ${k}")
         // 3. Trim the temporary array to the actual number of matched elements
         return Arrays.copyOf(temp, k);
+    }
+
+    public static int[] findIntersectionInPlaceBS(int [] arr1, int [] arr2)
+    {
+        if(arr1 == null){ return arr2;}
+        if(arr2 == null){ return arr1;}
+        def sml = arr1.length < arr2.length ? arr1 : arr2;
+        def big = arr1.length < arr2.length ? arr2 : arr1;
+        int k = 0;
+
+        sml.eachWithIndex{ val, idx ->
+            def n = Arrays.binarySearch(big, val)
+            //println("val: ${val} ${idx} ${n}")
+
+            if( n > -1 )
+            {
+                sml[k++] = big[n];
+            }
+        }
+        return Arrays.copyOf(sml, k);
     }
 
     public static int[] findIntersectionInPlace(int[] arr1, int[] arr2) {
@@ -926,4 +946,8 @@ cls; gi.sh  ~/work/groovy/jsonToTags.groovy file=/home/oo/ephemeral/ev.json prin
 {"or":["chain:AC?", "chain:Ab?y*"]}',
 {"or":["chain:Ab?y*", {"and":["name:sepol*", "shortName:bl*sepol*"]}]}'
 {"and":["vin:*135*",{"and": ["city:*e*", "city:*s*",{"or":["utility:*nn*", "utility:*ge*"]}]}, "postal-code:98*"] }
+
+curl -vk http://localhost:9091/k -d '["vin:kndrmdl*", "county:y*"]'
+curl -vk http://localhost:9091/q --data-binary '{"and":["vin:*135*",{"and": ["city:*e*", "city:*s*"]}, "postal-code:98*"] }'
+curl -vk http://localhost:9091/q --data-binary '{"and":["vin:*135*",{"and": ["city:*e*", "city:*s*",{"or":["utility:*nn*", "utility:*ge*"]}]}, "postal-code:98*"] }'
 */
